@@ -152,19 +152,19 @@
             {
               "id": "770e00d8-02de-465d-a28b-387dc07bad22",
               "name": "candidateName",
-              "value": "Etienne Lescot",
+              "value": "John Doe",
               "type": "string"
             },
             {
               "id": "23e0d14f-c236-42e6-a559-9bcb2fb41ef4",
               "name": "candidateEmail",
-              "value": "etiennelescot@gmail.com",
+              "value": "john@yopmail.com",
               "type": "string"
             },
             {
               "id": "1a173df7-672c-4db9-8569-a9d2e5a3d98e",
               "name": "candidatePhone",
-              "value": "+33 6 80 51 21 20",
+              "value": "+33 6 00 00 00 00",
               "type": "string"
             },
             {
@@ -200,31 +200,31 @@
             {
               "id": "ef1dba6b-c697-46cd-9873-9f109af8c894",
               "name": "cvUrlPdf",
-              "value": "https://etiennelescot.github.io/cv/pdf/cv-fr-light.pdf",
+              "value": "https://cv-fr-light.pdf",
               "type": "string"
             },
             {
               "id": "cb6b6fc1-cac9-4bde-bdac-b5fb65f2fed3",
               "name": "cvUrlWeb",
-              "value": "https://etiennelescot.github.io/cv/",
+              "value": "https://cv/",
               "type": "string"
             },
             {
               "id": "f30e006c-63b8-42ee-9197-83d709822a81",
               "name": "linkedinUrl",
-              "value": "https://www.linkedin.com/in/etienne-lescot-69402019/",
+              "value": "https://xxx",
               "type": "string"
             },
             {
               "id": "ac7fbc69-d7af-493c-9665-7cfe86973b9d",
               "name": "githubUrl",
-              "value": "https://github.com/EtienneLescot",
+              "value": "https://github.com",
               "type": "string"
             },
             {
               "id": "f9eaf5ee-0c36-46ec-8514-40341c44ef84",
               "name": "githubOwner",
-              "value": "EtienneLescot",
+              "value": "John Doe",
               "type": "string"
             },
             {
@@ -554,7 +554,7 @@
     },
     {
       "parameters": {
-        "sendTo": "etienne@etiennelescot.fr",
+        "sendTo": "jophn@yopmail.com",
         "subject": "={{ $('🧩 Build Application + Branch Output').item.json.output.email_subject }}",
         "message": "={{ $('🧩 Build Application + Branch Output').item.json.output.salutation }}<br><br>\n\n{{ $('🧩 Build Application + Branch Output').item.json.output.letter_body }}<br><br>\n\n{{ $('🧩 Build Application + Branch Output').item.json.output.key_selling_points }}\n\n<hr>\n\n<strong>{{ $('🧩 Build Application + Branch Output').item.json.output.job_title }}</strong>\n<br>\n{{ $('🧩 Build Application + Branch Output').item.json.output.job_url }}\n\n<hr>\n\n{{ $json.emailExtraMessage || ($binary && $binary.data ? '✅ Le PDF CV personnalisé est joint à cet email.' : 'ℹ️ Aucun PDF personnalisé disponible.') }}",
         "options": {
@@ -586,17 +586,17 @@
         "operation": "append",
         "documentId": {
           "__rl": true,
-          "value": "19T4_fD3djU7Uqy46X45xuDyroZco1rpiq8lOwWjo8uw",
+          "value": "xxxx",
           "mode": "list",
           "cachedResultName": "job offers processed",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/19T4_fD3djU7Uqy46X45xuDyroZco1rpiq8lOwWjo8uw/edit?usp=drivesdk"
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/xxxx/edit?usp=drivesdk"
         },
         "sheetName": {
           "__rl": true,
           "value": "gid=0",
           "mode": "list",
           "cachedResultName": "job urls",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/19T4_fD3djU7Uqy46X45xuDyroZco1rpiq8lOwWjo8uw/edit#gid=0"
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/xxxx/edit#gid=0"
         },
         "columns": {
           "mappingMode": "defineBelow",
@@ -642,17 +642,17 @@
       "parameters": {
         "documentId": {
           "__rl": true,
-          "value": "19T4_fD3djU7Uqy46X45xuDyroZco1rpiq8lOwWjo8uw",
+          "value": "xxxx",
           "mode": "list",
           "cachedResultName": "job offers processed",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/19T4_fD3djU7Uqy46X45xuDyroZco1rpiq8lOwWjo8uw/edit?usp=drivesdk"
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/xxxx/edit?usp=drivesdk"
         },
         "sheetName": {
           "__rl": true,
           "value": "gid=0",
           "mode": "list",
           "cachedResultName": "job urls",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/19T4_fD3djU7Uqy46X45xuDyroZco1rpiq8lOwWjo8uw/edit#gid=0"
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/xxxx/edit#gid=0"
         },
         "options": {}
       },
@@ -909,7 +909,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const config = $('⚙️ Configuration1').first().json;\nconst job = $('Loop Over Application').item.json.job ?? {};\nconst output = $json.output ?? {};\n\nconst slugify = (value) => String(value || 'unknown')\n  .normalize('NFD')\n  .replace(/[\\u0300-\\u036f]/g, '')\n  .toLowerCase()\n  .replace(/[^a-z0-9]+/g, '-')\n  .replace(/^-+|-+$/g, '')\n  .slice(0, 40) || 'unknown';\n\nconst companySlug = slugify(job.company || 'company');\nconst titleSlug = slugify(output.job_title || job.title || 'job');\nconst suffix = String($execution.id || Date.now()).slice(-8);\nconst branchName = `cv/${companySlug}-${titleSlug}-${suffix}`;\n\nconst repository = `${config.githubOwner}/${config.githubRepo}`;\nconst filePath = config.githubLocaleFilePath || 'locales/fr.yml';\nconst pdfPath = config.githubPdfPath || 'pdf/cv-fr-light.pdf';\nconst locale = config.targetLanguage || 'fr';\nconst nowIso = new Date().toISOString();\nconst entryKey = `${companySlug}-${titleSlug}-${suffix}`;\n\nreturn [{\n  json: {\n    repository,\n    githubOwner: config.githubOwner,\n    githubRepo: config.githubRepo,\n    baseBranch: config.githubBaseBranch || 'main',\n    branchName,\n    locale,\n    filePath,\n    pdfPath,\n    entryKey,\n    nowIso,\n    sendTo: config.candidateEmail || 'etiennelescot@gmail.com',\n    jobUrl: output.job_url || job.url || '',\n    jobTitle: output.job_title || job.title || '',\n    company: job.company || '',\n    targetWorkflowName: config.githubActionWorkflowName || 'Build and Commit PDFs',\n    pollIntervalSeconds: Number(config.githubActionPollSeconds || 30),\n    pollMaxAttempts: Number(config.githubActionMaxPollAttempts || 20),\n    prDraft: Boolean(config.githubPrDraft),\n    token: config.githubToken || ''\n  }\n}];"
+        "jsCode": "const config = $('⚙️ Configuration1').first().json;\nconst job = $('Loop Over Application').item.json.job ?? {};\nconst output = $json.output ?? {};\n\nconst slugify = (value) => String(value || 'unknown')\n  .normalize('NFD')\n  .replace(/[\\u0300-\\u036f]/g, '')\n  .toLowerCase()\n  .replace(/[^a-z0-9]+/g, '-')\n  .replace(/^-+|-+$/g, '')\n  .slice(0, 40) || 'unknown';\n\nconst companySlug = slugify(job.company || 'company');\nconst titleSlug = slugify(output.job_title || job.title || 'job');\nconst suffix = String($execution.id || Date.now()).slice(-8);\nconst branchName = `cv/${companySlug}-${titleSlug}-${suffix}`;\n\nconst repository = `${config.githubOwner}/${config.githubRepo}`;\nconst filePath = config.githubLocaleFilePath || 'locales/fr.yml';\nconst pdfPath = config.githubPdfPath || 'pdf/cv-fr-light.pdf';\nconst locale = config.targetLanguage || 'fr';\nconst nowIso = new Date().toISOString();\nconst entryKey = `${companySlug}-${titleSlug}-${suffix}`;\n\nreturn [{\n  json: {\n    repository,\n    githubOwner: config.githubOwner,\n    githubRepo: config.githubRepo,\n    baseBranch: config.githubBaseBranch || 'main',\n    branchName,\n    locale,\n    filePath,\n    pdfPath,\n    entryKey,\n    nowIso,\n    sendTo: config.candidateEmail || 'john@yopmail.com',\n    jobUrl: output.job_url || job.url || '',\n    jobTitle: output.job_title || job.title || '',\n    company: job.company || '',\n    targetWorkflowName: config.githubActionWorkflowName || 'Build and Commit PDFs',\n    pollIntervalSeconds: Number(config.githubActionPollSeconds || 30),\n    pollMaxAttempts: Number(config.githubActionMaxPollAttempts || 20),\n    prDraft: Boolean(config.githubPrDraft),\n    token: config.githubToken || ''\n  }\n}];"
       },
       "id": "d8cdb256-a4d9-4e96-8ac9-0180e522fb57",
       "name": "🧩 Build GitHub Branch Payload",
@@ -1182,7 +1182,7 @@
     },
     {
       "parameters": {
-        "sendTo": "etienne@etiennelescot.fr",
+        "sendTo": "john@yopmail.com",
         "subject": "=✅ Branche GitHub supprimée - {{ $('🧩 Parse Workflow Run Status').item.json.branchName }}",
         "message": "=<h2>🗑️ Suppression de branche confirmée</h2>\n\n<p>La branche GitHub <strong>{{ $('🧩 Parse Workflow Run Status').item.json.branchName }}</strong> a été supprimée avec succès.</p>\n\n<p><strong>Détails :</strong></p>\n<ul>\n  <li>Repository: {{ $('🧩 Parse Workflow Run Status').item.json.githubOwner }}/{{ $('🧩 Parse Workflow Run Status').item.json.githubRepo }}</li>\n  <li>Branche: {{ $('🧩 Parse Workflow Run Status').item.json.branchName }}</li>\n  <li>Date: {{ $now.format('dd/MM/yyyy HH:mm') }}</li>\n</ul>\n\n<p>Le processus de candidature a été finalisé.</p>",
         "options": {}
