@@ -1,0 +1,1884 @@
+{
+  "name": "Job Application Assistant",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "5580f339-470c-4eb3-b900-ad0c8bbc77ef",
+      "name": "🕘 Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1072,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "=indeed_search_{{ $execution.id }}",
+        "contextWindowLength": 8
+      },
+      "id": "19ab2381-a92b-4f06-a0fc-882f798e1da6",
+      "name": "💾 Memory: Search Indeed",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        1952,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"title\": \"JobOffersList\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"jobs\": {\n      \"type\": \"array\",\n      \"description\": \"Liste des offres d'emploi trouvées.\",\n      \"items\": {\n        \"type\": \"object\",\n        \"required\": [\n          \"jobId\",\n          \"title\",\n          \"company\",\n          \"url\",\n          \"location\",\n          \"whyMatch\"\n        ],\n        \"properties\": {\n          \"jobId\": {\n            \"type\": \"string\",\n            \"description\": \"Identifiant unique trouvé sur la plateforme (ex: 'job_12345').\"\n          },\n          \"title\": {\n            \"type\": \"string\",\n            \"description\": \"Intitulé exact du poste.\"\n          },\n          \"description\": {\n            \"type\": \"string\",\n            \"description\": \"the job full description\"\n          },\n          \"company\": {\n            \"type\": \"string\",\n            \"description\": \"Nom de l'entreprise recruteuse.\"\n          },\n          \"url\": {\n            \"type\": \"string\",\n            \"description\": \"URL absolue vers l'offre.\"\n          },\n          \"location\": {\n            \"type\": \"object\",\n            \"required\": [\"city\", \"remotePolicy\"],\n            \"properties\": {\n              \"city\": { \"type\": \"string\", \"description\": \"Ville.\" },\n              \"zipCode\": { \"type\": \"string\", \"description\": \"Code postal si disponible.\" },\n              \"remotePolicy\": { \n                \"type\": \"string\", \n                \"enum\": [\"On-site\", \"Remote\", \"Hybrid\", \"Not Specified\"],\n                \"description\": \"Politique de télétravail.\"\n              }\n            }\n          },\n          \"salary\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"min\": { \"type\": \"number\", \"description\": \"Salaire minimum (nombre uniquement). Omettre si inconnu.\" },\n              \"max\": { \"type\": \"number\", \"description\": \"Salaire maximum (nombre uniquement). Omettre si inconnu.\" },\n              \"currency\": { \"type\": \"string\", \"description\": \"Devise (EUR, USD, etc.)\", \"default\": \"EUR\" },\n              \"text\": { \"type\": \"string\", \"description\": \"Mention brute du salaire si format complexe.\" }\n            }\n          },\n          \"jobType\": {\n            \"type\": \"string\",\n            \"description\": \"Type de contrat : CDI, CDD, Freelance, Alternance, Stage.\"\n          },\n          \"whyMatch\": {\n            \"type\": \"string\",\n            \"description\": \"Analyse concise expliquant la pertinence du poste.\"\n          },\n          \"relevanceScore\": {\n            \"type\": \"integer\",\n            \"description\": \"Score de pertinence de 0 à 100.\"\n          }\n        }\n      }\n    }\n  }\n}",
+        "autoFix": true
+      },
+      "id": "67eb1a8b-e9d1-4e94-9c77-6f8199724983",
+      "name": "📋 Parse: Search Results",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        2080,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "=application_pack_{{ $execution.id }}",
+        "contextWindowLength": 6
+      },
+      "id": "13ff260c-fb7e-45bb-90db-921463f94f2b",
+      "name": "💾 Memory: Application Pack",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        2896,
+        576
+      ]
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n\t\"type\": \"object\",\n\t\"properties\": {\n\t\t\"email_subject\": {\n\t\t\t\"type\": \"string\",\n\t\t\t\"description\": \"A professional and catchy subject line for the application email (e.g., 'Application for [Role] - [Name]')\"\n\t\t},\n\t\t\"salutation\": {\n\t\t\t\"type\": \"string\",\n\t\t\t\"description\": \"The greeting line (e.g., 'Dear Hiring Manager,' or the specific name if found in the job description)\"\n\t\t},\n\t\t\"letter_body\": {\n\t\t\t\"type\": \"string\",\n\t\t\t\"description\": \"The core content of the cover letter in Markdown. Exclude the subject line and the greeting.\"\n\t\t},\n\t\t\"key_selling_points\": {\n\t\t\t\"type\": \"array\",\n\t\t\t\"items\": {\n\t\t\t\t\"type\": \"string\"\n\t\t\t},\n\t\t\t\"description\": \"A list of the top 3 skills or achievements extracted from the profile that best match this specific job.\"\n\t\t},\n        \"job_url\": {\n\t\t\t\"type\": \"string\",\n\t\t\t\"description\": \"The url of the job offer\"\n\t\t},\n        \"job_title\": {\n\t\t\t\"type\": \"string\",\n\t\t\t\"description\": \"The title of the job offer\"\n\t\t}\n\t},\n\t\"required\": [\n\t\t\"email_subject\",\n\t\t\"salutation\",\n\t\t\"letter_body\",\n        \"job_url\",\n        \"job_title\"\n\t]\n}",
+        "autoFix": true
+      },
+      "id": "ef9f17a7-92ba-4ff1-8606-ee4a776151bf",
+      "name": "📋 Parse: Application Pack",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        3024,
+        576
+      ]
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3-flash-preview",
+        "options": {}
+      },
+      "id": "7d2d646a-8d17-418c-8a9d-c9663a38574b",
+      "name": "Google Gemini Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        2016,
+        736
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "DunK9FvUJHIlLybd",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "results",
+        "options": {}
+      },
+      "id": "14a5da16-a979-4ef0-9cd3-2b6a299cac53",
+      "name": "📦 Aggregate: Profile Sources",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        -176,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "=profile_intel_{{ $execution.id }}",
+        "contextWindowLength": 8
+      },
+      "id": "8e6d8704-8659-43f5-ba17-6d119e2d09b6",
+      "name": "💾 Memory: Profile Intelligence1",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        64,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n  \"title\": \"Profil de Recherche d'Emploi\",\n  \"type\": \"object\",\n  \"required\": [\n    \"primaryRoles\",\n    \"secondaryRoles\",\n    \"coreSkills\",\n    \"seniority\",\n    \"expected_salary\",\n    \"searchQueries\",\n    \"exclusions\",\n    \"locationQuery\",\n    \"rationale\"\n  ],\n  \"properties\": {\n    \"primaryRoles\": {\n      \"type\": \"array\",\n      \"description\": \"Liste des rôles principaux ciblés.\",\n      \"items\": {\n        \"type\": \"string\"\n      }\n    },\n    \"secondaryRoles\": {\n      \"type\": \"array\",\n      \"description\": \"Liste des rôles secondaires ou connexes.\",\n      \"items\": {\n        \"type\": \"string\"\n      }\n    },\n    \"coreSkills\": {\n      \"type\": \"array\",\n      \"description\": \"Compétences clés requises pour le poste.\",\n      \"items\": {\n        \"type\": \"string\"\n      }\n    },\n    \"seniority\": {\n      \"type\": \"string\",\n      \"description\": \"Niveau d'expérience (ex: Junior, Senior, Lead).\"\n    },\n    \"expected_salary\": {\n      \"type\": \"string\",\n      \"description\": \"Salaire minimum\"\n    },\n    \"searchQueries\": {\n      \"type\": \"array\",\n      \"description\": \"Requêtes optimisées pour Indeed en français et en anglais.\",\n      \"items\": {\n        \"type\": \"string\"\n      }\n    },\n    \"exclusions\": {\n      \"type\": \"array\",\n      \"description\": \"Mots-clés à exclure de la recherche.\",\n      \"items\": {\n        \"type\": \"string\"\n      }\n    },\n    \"locationQuery\": {\n      \"type\": \"object\",\n      \"description\": \"Détails géographiques de la recherche.\",\n      \"properties\": {\n        \"state\": {\n          \"type\": \"string\",\n          \"description\": \"Région, province ou État.\"\n        },\n        \"cities\": {\n          \"type\": \"array\",\n          \"description\": \"Liste des villes ciblées.\",\n          \"items\": {\n            \"type\": \"string\"\n          }\n        }\n      },\n      \"required\": [\"state\", \"cities\"]\n    },\n    \"rationale\": {\n      \"type\": \"string\",\n      \"description\": \"Justification ou logique derrière cette stratégie de recherche.\"\n    }\n  }\n}"
+      },
+      "id": "a7343f9b-7da0-4898-b3fe-b47c6356f524",
+      "name": "📋 Parse: Profile Intelligence1",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        192,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "770e00d8-02de-465d-a28b-387dc07bad22",
+              "name": "candidateName",
+              "value": "Etienne Lescot",
+              "type": "string"
+            },
+            {
+              "id": "23e0d14f-c236-42e6-a559-9bcb2fb41ef4",
+              "name": "candidateEmail",
+              "value": "etiennelescot@gmail.com",
+              "type": "string"
+            },
+            {
+              "id": "1a173df7-672c-4db9-8569-a9d2e5a3d98e",
+              "name": "candidatePhone",
+              "value": "+33 6 80 51 21 20",
+              "type": "string"
+            },
+            {
+              "id": "75935f15-263f-4d1a-bb2a-4f0495a5977d",
+              "name": "targetLocation",
+              "value": "Rennes",
+              "type": "string"
+            },
+            {
+              "id": "b66717e5-9008-49b7-a70f-5a46d4a9fd16",
+              "name": "targetLanguage",
+              "value": "fr",
+              "type": "string"
+            },
+            {
+              "id": "8dec8eeb-6612-4f0c-b4d7-d802a43d0bc0",
+              "name": "remotePreference",
+              "value": "hybrid",
+              "type": "string"
+            },
+            {
+              "id": "a6ff7374-6e40-498c-8cda-03cb6814c5e8",
+              "name": "minimumSalaryAnnual",
+              "value": "60 000",
+              "type": "string"
+            },
+            {
+              "id": "1186e511-98f8-42f7-a1c7-c775d1ba7cc6",
+              "name": "maxJobsToProcess",
+              "value": 5,
+              "type": "number"
+            },
+            {
+              "id": "ef1dba6b-c697-46cd-9873-9f109af8c894",
+              "name": "cvUrlPdf",
+              "value": "https://etiennelescot.github.io/cv/pdf/cv-fr-light.pdf",
+              "type": "string"
+            },
+            {
+              "id": "cb6b6fc1-cac9-4bde-bdac-b5fb65f2fed3",
+              "name": "cvUrlWeb",
+              "value": "https://etiennelescot.github.io/cv/",
+              "type": "string"
+            },
+            {
+              "id": "f30e006c-63b8-42ee-9197-83d709822a81",
+              "name": "linkedinUrl",
+              "value": "https://www.linkedin.com/in/etienne-lescot-69402019/",
+              "type": "string"
+            },
+            {
+              "id": "ac7fbc69-d7af-493c-9665-7cfe86973b9d",
+              "name": "githubUrl",
+              "value": "https://github.com/EtienneLescot",
+              "type": "string"
+            },
+            {
+              "id": "f9eaf5ee-0c36-46ec-8514-40341c44ef84",
+              "name": "githubOwner",
+              "value": "EtienneLescot",
+              "type": "string"
+            },
+            {
+              "id": "88fdb269-e3f6-4d17-ac3a-a16260060543",
+              "name": "githubRepo",
+              "value": "cv",
+              "type": "string"
+            },
+            {
+              "id": "bdca111c-c24d-4f95-ae40-e646f1539921",
+              "name": "githubBaseBranch",
+              "value": "main",
+              "type": "string"
+            },
+            {
+              "id": "683ec5bf-a45e-40cb-888d-5d0f8c758f90",
+              "name": "githubLocaleFilePath",
+              "value": "locales/fr.yml",
+              "type": "string"
+            },
+            {
+              "id": "b9d8c2ab-59c3-4f53-84b7-75f1a6b6be7b",
+              "name": "githubPdfPath",
+              "value": "pdf/cv-fr-light.pdf",
+              "type": "string"
+            },
+            {
+              "id": "29d03144-ec2e-4980-9387-ad6ec6d826a1",
+              "name": "githubActionPollSeconds",
+              "value": 30,
+              "type": "number"
+            },
+            {
+              "id": "f2f45f77-cb4f-4a90-a633-8767ec06bf0c",
+              "name": "githubActionMaxPollAttempts",
+              "value": 20,
+              "type": "number"
+            },
+            {
+              "id": "89eb427b-a6f4-47ec-bf53-2f687c8abf5b",
+              "name": "githubActionWorkflowName",
+              "value": "Build and Commit PDFs",
+              "type": "string"
+            },
+            {
+              "id": "f8eb7364-935b-4669-8bd4-d41922adfcbe",
+              "name": "githubToken",
+              "value": "xxx",
+              "type": "string"
+            },
+            {
+              "id": "8a6a9362-2068-4fa0-b13c-8b3e6df74e4a",
+              "name": "githubPrDraft",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "bdd9decd-9de7-4604-9aaa-34261567b8c8",
+      "name": "⚙️ Configuration1",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -848,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"urls\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\",\n        \"format\": \"uri\"\n      },\n      \"minItems\": 6,\n      \"maxItems\": 12,\n      \"description\": \"Liste des URLs générées\"\n    }\n  },\n  \"required\": [\"strategie\", \"urls\"]\n}"
+      },
+      "id": "f825bc75-20d1-45a2-8a11-5e80bffb5e93",
+      "name": "Structured Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        544,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "=url_{{ $execution.id }}",
+        "contextWindowLength": 8
+      },
+      "id": "90c4f615-73a3-4395-a817-fadb0b5d4f13",
+      "name": "💾 Memory: Profile Intelligence",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        416,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "results",
+        "options": {}
+      },
+      "id": "0fb1983b-3f24-4d95-b1ec-cb93a3b41a82",
+      "name": "📦 Aggregate: Job Applications",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        3024,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.first().json.output.jobs.map((job)=>{return {job}})"
+      },
+      "id": "51b38592-1bb6-49c9-94eb-df55cce54539",
+      "name": "🧾 Build Selected Jobs Source",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2448,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.first().json.output.urls.map((url)=>{return {url}})"
+      },
+      "id": "62afa358-27ac-428b-8023-24b56bfc8a13",
+      "name": "🧾 Build Search Urls",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        752,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Search Strategy:\nPrimary roles:\n{{ $('🎯 Agent: Profile Generation').item.json.output.primaryRoles }}\nSecondary roles:\n{{ $('🎯 Agent: Profile Generation').item.json.output.secondaryRoles }}\ncoreSkills:\n{{ $('🎯 Agent: Profile Generation').item.json.output.coreSkills }}\nSeniority:\n{{ $('🎯 Agent: Profile Generation').item.json.output.seniority }}\n\nSearch Queries:\n{{ $('🎯 Agent: Profile Generation').item.json.output.searchQueries }}\n\nExclusions:\n{{ $('🎯 Agent: Profile Generation').item.json.output.exclusions }}\n\nLocation Query:\n{{ $('🎯 Agent: Profile Generation').item.json.output.locationQuery.cities }}, {{ $('🎯 Agent: Profile Generation').item.json.output.locationQuery.state }}\n\nRationale:\n{{ $('🎯 Agent: Profile Generation').item.json.output.rationale }}\n",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=You are a URL generation agent for the France Travail API\nBase URL\nhttps://api.francetravail.io/partenaire/offresdemploi/v2/offres/search\nObjective\nGenerate complementary URLs to maximize result coverage. Each URL should explore a different angle (varied keywords, different geographic areas, etc.).\nAvailable Parameters\nLocation (mandatory - at least 1)\n\ncommune: 5-digit INSEE code. Ex: 35238 (Rennes), 29019 (Brest), 44109 (Nantes), 75056 (Paris)\ndepartement: 2-3 digit code. Ex: 35, 29, 56, 22\nrayon: Distance in km (10, 20, 30, 50). Requires commune\n\nSearch\n\nmotsCles: max 2 keywords per url\n\n\nPagination\n\nrange: Always add 0-149 (max 150 results/request)\n\nSplitting Strategies\nBy keywords: Job variants\n\n\"developer\" → développeur+front, développeur+back, fullstack, développeur+mobile\n\nBy areas: Different cities\n\n\"Brittany\" → Rennes (35238), Brest (29019), Vannes (56260), Saint-Brieuc (22278)\n\n\n\nRules\n\n6-12 URLs optimal (min 6, max 12)\nAlways include range=0-149\nAvoid overly restrictive parameters that miss offers\nPrefer motsCles variations over strict filters\nNo duplicates between URLs\n\nResponse Format\nURL 1: [complete URL]\nURL 2: [complete URL]\nURL 3: [complete URL]\nExample\nRequest: Python Developer CDI in Rennes\nSTRATEGY: 3 URLs with keyword variations to cover different job posting formulations.\n\nif {{ $('⚙️ Configuration1').item.json.remotePreference }} is \"hybrid\" or \"fullremote\" or \"remote\", then you can also produces urls without commune, but in this case, you need to add specific keywords.\n\nURL 1: https://api.francetravail.io/partenaire/offresdemploi/v2/offres/search?commune=35238&rayon=20&motsCles=développeur+python&typeContrat=CDI&range=0-149\nURL 2: https://api.francetravail.io/partenaire/offresdemploi/v2/offres/search?commune=35238&rayon=20&motsCles=python&typeContrat=CDI&range=0-149\nURL 3: https://api.francetravail.io/partenaire/offresdemploi/v2/offres/search?commune=35238&rayon=30&motsCles=backend+python&typeContrat=CDI&range=0-149",
+          "maxIterations": 10
+        }
+      },
+      "id": "7ccde75f-8333-469e-a875-b59f51fd8b5d",
+      "name": "🔎 Agent: Search Urls generation",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        400,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Build a precise Indeed search strategy from these profile sources.\n\nCandidate:\n- Name: {{ $('⚙️ Configuration1').item.json.candidateName }}\n- Target location: {{ $('⚙️ Configuration1').item.json.targetLocation }}\n- Remote preference: {{ $('⚙️ Configuration1').item.json.remotePreference }}\n- Minimum annual salary: {{ $('⚙️ Configuration1').item.json.minimumSalaryAnnual }}\n\nProfile Source Content:\n{{ JSON.stringify($json) }}\n\nReturn a JSON object with:\n- primaryRoles (array of strings)\n- secondaryRoles (array of strings)\n- coreSkills (array of strings)\n- seniority (string)\n- expected salary (string)\n- searchQueries (array of optimized Indeed-targeted queries in French and English)\n- exclusions (array of terms to avoid)\n- locationQuery (string)\n- rationale (short string)",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a profile intelligence agent for job search automation. Infer realistic target roles and search queries from resume/profile content. Keep outputs concrete, concise, and useful for Indeed search.",
+          "maxIterations": 4
+        }
+      },
+      "id": "1182efb6-5271-4c91-a51e-3ba0bd8a8f1a",
+      "name": "🎯 Agent: Profile Generation",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        48,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const original = $input.first().json;\n\nconst pickedArray = [original.cvUrlWeb, original.linkedinUrl, original.githubUrl]\n  .filter((url) => typeof url === 'string' && url.trim().length > 0);\n\nreturn pickedArray.map((url) => ({\n  json: {\n    url: url.trim()\n  }\n}));\n"
+      },
+      "id": "535b047e-aae7-466b-a2e4-604214996e5d",
+      "name": "🧾 Build Profile Sources",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -624,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "outputFormat": "markdown"
+        },
+        "requestOptions": {}
+      },
+      "id": "92cd5025-6b82-466e-9f15-1665f74f1969",
+      "name": "📖 Jina: Read Profile Source",
+      "type": "n8n-nodes-base.jinaAi",
+      "typeVersion": 1,
+      "position": [
+        -176,
+        640
+      ],
+      "credentials": {
+        "jinaAiApi": {
+          "id": "YmIMq9jd5lNUfwOe",
+          "name": "Jina AI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "1d7abcfa-fdf5-4e0c-bf2e-15bfd00c3b6a",
+      "name": "Loop Over profile sources",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -400,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=JOB OFFERS :\n{{ JSON.stringify($json.results) }}\n",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=You are an autonomous job hunter agent. Prioritize relevance over quantity, and produce clean structured output.\n\nUse the generated strategy to find relevant jobs and return structured jobs.\n\nSearch Strategy:\nPrimary roles:\n{{ $('🎯 Agent: Profile Generation').item.json.output.primaryRoles }}\nSecondary roles:\n{{ $('🎯 Agent: Profile Generation').item.json.output.secondaryRoles }}\ncoreSkills:\n{{ $('🎯 Agent: Profile Generation').item.json.output.coreSkills }}\nSeniority:\n{{ $('🎯 Agent: Profile Generation').item.json.output.seniority }}\nExpected salary:\n{{ $('🎯 Agent: Profile Generation').item.json.output.expected_salary }}\n\nSearch Queries:\n{{ $('🎯 Agent: Profile Generation').item.json.output.searchQueries }}\n\nExclusions:\n{{ $('🎯 Agent: Profile Generation').item.json.output.exclusions }}\n\nLocation Query:\n{{ $('🎯 Agent: Profile Generation').item.json.output.locationQuery.cities }}, {{ $('🎯 Agent: Profile Generation').item.json.output.locationQuery.state }}\n\nRationale:\n{{ $('🎯 Agent: Profile Generation').item.json.output.rationale }}\n\nRules:\n1) FIND MATCHING OFFERS\n2) Never invent or allucinate offers. always rely on JOB OFFERS in your context.\n2) Return max {{ $('⚙️ Configuration1').item.json.maxJobsToProcess }} jobs.\n5) If no match simply return \"Aucune offre correspondante\"\n\nReturn JSON object with key 'jobs' as array of objects:\n- jobId\n- title\n- company\n- url\n- location\n- snippet\n- fullDescription\n- salary\n- jobType\n- whyMatch\nAll those propertied must be found in context below. Do not invent properties.",
+          "maxIterations": 10
+        }
+      },
+      "id": "9509bd0e-9c9a-4667-8ee9-4a89e273eb11",
+      "name": "🔎 Agent: Jobs selection",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        1872,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "results",
+        "options": {}
+      },
+      "id": "651263fb-bf3a-4e94-809d-2f10c5d89617",
+      "name": "📦 Aggregate: Jobs",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1200,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {}
+      },
+      "id": "a9ae48f4-b4df-4e71-a1eb-a5da173b665d",
+      "name": "Get job results",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1200,
+        496
+      ],
+      "credentials": {
+        "oAuth2Api": {
+          "id": "J9iSODXgx8QvabD8",
+          "name": "France Travail"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "24f00a37-dcee-4819-814e-7d982a740af5",
+      "name": "Loop Over Job results responses",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        976,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "752baaac-264f-4026-b72f-f1a66a2171e4",
+      "name": "Loop Over Application",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        2672,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "agent": "conversationalAgent",
+        "promptType": "define",
+        "text": "=Create a tailored application package for this job.\n\n\n**CANDIDATE_PROFILE:**\nPrimary roles:\n{{ $('🎯 Agent: Profile Generation').item.json.output.primaryRoles }}\nSecondary roles:\n{{ $('🎯 Agent: Profile Generation').item.json.output.secondaryRoles }}\ncoreSkills:\n{{ $('🎯 Agent: Profile Generation').item.json.output.coreSkills }}\nSeniority:\n{{ $('🎯 Agent: Profile Generation').item.json.output.seniority }}\nExpected salary:\n{{ $('🎯 Agent: Profile Generation').item.json.output.seniority }}\n\nSearch Queries:\n{{ $('🎯 Agent: Profile Generation').item.json.output.searchQueries }}\n\nExclusions:\n{{ $('🎯 Agent: Profile Generation').item.json.output.exclusions }}\n\nLocation Query:\n{{ $('🎯 Agent: Profile Generation').item.json.output.locationQuery.cities }}, {{ $('🎯 Agent: Profile Generation').item.json.output.locationQuery.state }}\n\nRationale:\n{{ $('🎯 Agent: Profile Generation').item.json.output.rationale }}\n\n**CANDIDATE_FULL_DATA:**\n{{ JSON.stringify($('📦 Aggregate: Profile Sources').item.json.results) }}\n\n**JOB_DATA:**\nJob url: {{ $json.job.url }}\nJob title: {{ $json.job.title }}\nJob description: {{ $json.job.description }}\nJob location: {{ JSON.stringify($json.job.location) }}\nJob type: {{ $json.job.jobType }}\nWhy match: {{ $json.job.whyMatch }}\nRelevance Score: {{ $json.job.relevanceScore }}\n\n",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=### ROLE\nYou are an expert Career Strategist and Professional Copywriter with 15 years of experience in recruitment. Your goal is to write a highly persuasive, personalized, and professional cover letter.\n\n### INPUT DATA\nYou will receive three distinct blocks of information:\n1. **CANDIDATE_PROFILE:** Information about the user (Resume, bio, skills, experience).\n2. **CANDIDATE_FULL_DATA:** Full data about the candidate that you can use if you find specific matches that were not highlighted in **CANDIDATE_PROFILE:**\n3. **JOB_DESCRIPTION:** Details about the target role (Responsibilities, requirements, company culture).\n\n### OBJECTIVE\nAnalyze the `CANDIDATE_PROFILE` to find specific evidence that matches the requirements in the `JOB_DESCRIPTION`. Write a cover letter that proves the candidate is the perfect fit for this specific role.\n\n### WRITING GUIDELINES\n1.  **Tone:** Professional, confident, enthusiastic, and authentic. Match the tone of the job description (e.g., if the JD is formal, be formal; if it's a startup, be dynamic).\n2.  **Structure:**\n    * **Header:** Standard formal letter format (placeholders for contact info if not provided).\n    * **Hook:** Don't start with \"I am writing to apply...\" Start with a strong opening sentence about the value the candidate brings or their passion for the company's mission.\n    * **The \"Bridge\":** Connect the candidate's past achievements directly to the company's future goals. Use metrics and specific examples from the `CANDIDATE_PROFILE`.\n    * **Company Fit:** Briefly mention why this specific company appeals to the candidate (based on the `JOB_DESCRIPTION`).\n    * **Call to Action:** A confident closing inviting an interview.\n3.  **Constraints:**\n    * Do NOT invent experiences not present in the `CANDIDATE_PROFILE`.\n    * Do NOT simply summarize the resume. Interpret the experience.\n    * Keep the length between 250-400 words.\n    * Output letter_body and key_selling_points properties strings in HTML.\n\n### CRITICAL INSTRUCTION\nIf the `CANDIDATE_PROFILE` is missing a specific skill required in the `JOB_DESCRIPTION`, focus on transferable skills and the ability to learn quickly. Do not lie.\nYou have to answer in a structured outpy json.\nyou also have to remind the job url and the job title in the structured json output.\n\nNow, wait for the user to provide the data contexts."
+        }
+      },
+      "id": "36a201c2-6ed0-4138-8de9-a61dfa6e0fa3",
+      "name": "✍️ Agent: Generate Application",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        2928,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "etienne@etiennelescot.fr",
+        "subject": "={{ $('🧩 Build Application + Branch Output').item.json.output.email_subject }}",
+        "message": "={{ $('🧩 Build Application + Branch Output').item.json.output.salutation }}<br><br>\n\n{{ $('🧩 Build Application + Branch Output').item.json.output.letter_body }}<br><br>\n\n{{ $('🧩 Build Application + Branch Output').item.json.output.key_selling_points }}\n\n<hr>\n\n<strong>{{ $('🧩 Build Application + Branch Output').item.json.output.job_title }}</strong>\n<br>\n{{ $('🧩 Build Application + Branch Output').item.json.output.job_url }}\n\n<hr>\n\n{{ $json.emailExtraMessage || ($binary && $binary.data ? '✅ Le PDF CV personnalisé est joint à cet email.' : 'ℹ️ Aucun PDF personnalisé disponible.') }}",
+        "options": {
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {}
+            ]
+          }
+        }
+      },
+      "id": "14c03b9b-0fe5-4b40-81b0-d8ac52594f1a",
+      "name": "📧 Send: Application Output",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        7344,
+        352
+      ],
+      "webhookId": "81a80254-cea3-4fde-b02a-11a7e10c8c35",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "6z4EpEOJZDp56mUm",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "19T4_fD3djU7Uqy46X45xuDyroZco1rpiq8lOwWjo8uw",
+          "mode": "list",
+          "cachedResultName": "job offers processed",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/19T4_fD3djU7Uqy46X45xuDyroZco1rpiq8lOwWjo8uw/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "job urls",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/19T4_fD3djU7Uqy46X45xuDyroZco1rpiq8lOwWjo8uw/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "URLS": "={{ $('✍️ Agent: Generate Application').item.json.output.job_url }}"
+          },
+          "matchingColumns": [
+            "URLS"
+          ],
+          "schema": [
+            {
+              "id": "URLS",
+              "displayName": "URLS",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "c4c7fee1-f3b8-417b-87f0-65744e8f468e",
+      "name": "Append row in sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        7568,
+        352
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "Fz0wVJr8gulKyizm",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "19T4_fD3djU7Uqy46X45xuDyroZco1rpiq8lOwWjo8uw",
+          "mode": "list",
+          "cachedResultName": "job offers processed",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/19T4_fD3djU7Uqy46X45xuDyroZco1rpiq8lOwWjo8uw/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "job urls",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/19T4_fD3djU7Uqy46X45xuDyroZco1rpiq8lOwWjo8uw/edit#gid=0"
+        },
+        "options": {}
+      },
+      "id": "1443c96a-cf31-4f6a-87d7-facac5a5eb7a",
+      "name": "Get already processed jobs urls",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1424,
+        304
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "Fz0wVJr8gulKyizm",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const normalizeUrl = (value) => {\n  if (typeof value !== 'string') return '';\n\n  const raw = value.trim();\n  if (!raw) return '';\n\n  try {\n    const parsed = new URL(raw);\n    const normalizedPath = parsed.pathname.replace(/\\/+$|^$/, '/');\n    return `${parsed.protocol.toLowerCase()}//${parsed.hostname.toLowerCase()}${normalizedPath}${parsed.search}`;\n  } catch {\n    return raw.replace(/\\/+$|^$/, '/');\n  }\n};\n\nconst addProcessedOffer = (offer, processedUrls, processedIds) => {\n  const offerUrl = normalizeUrl(\n    offer?.origineOffre?.urlOrigine ??\n    offer?.origineOffre?.url ??\n    offer?.urlOrigine ??\n    offer?.url\n  );\n\n  if (offerUrl) {\n    processedUrls.add(offerUrl);\n  }\n\n  const offerId = offer?.id != null ? String(offer.id).trim() : '';\n  if (offerId) {\n    processedIds.add(offerId);\n  }\n};\n\nconst processedUrls = new Set();\nconst processedIds = new Set();\n\nfor (const item of $input.all()) {\n  const json = item?.json ?? {};\n\n  const directUrl = json.URLS ?? json.url ?? json.Url ?? json.urls;\n  const normalizedDirectUrl = normalizeUrl(directUrl);\n  if (normalizedDirectUrl) {\n    processedUrls.add(normalizedDirectUrl);\n  }\n\n  const directId = json.id != null ? String(json.id).trim() : '';\n  if (directId) {\n    processedIds.add(directId);\n  }\n\n  if (Array.isArray(json.resultats)) {\n    for (const offer of json.resultats) {\n      addProcessedOffer(offer, processedUrls, processedIds);\n    }\n  }\n\n  if (Array.isArray(json.results)) {\n    for (const resultBlock of json.results) {\n      if (Array.isArray(resultBlock?.resultats)) {\n        for (const offer of resultBlock.resultats) {\n          addProcessedOffer(offer, processedUrls, processedIds);\n        }\n      } else if (resultBlock && typeof resultBlock === 'object') {\n        addProcessedOffer(resultBlock, processedUrls, processedIds);\n      }\n    }\n  }\n}\n\nconst aggregated = $('📦 Aggregate: Jobs').first()?.json?.results;\nconst results = Array.isArray(aggregated) ? aggregated : [];\n\nconst filteredResults = results\n  .map((responseItem) => {\n    if (!Array.isArray(responseItem?.resultats)) {\n      return responseItem;\n    }\n\n    const filteredOffers = responseItem.resultats.filter((offer) => {\n      const offerUrl = normalizeUrl(\n        offer?.origineOffre?.urlOrigine ??\n        offer?.origineOffre?.url ??\n        offer?.urlOrigine ??\n        offer?.url\n      );\n      const offerId = offer?.id != null ? String(offer.id).trim() : '';\n\n      const isProcessedByUrl = offerUrl && processedUrls.has(offerUrl);\n      const isProcessedById = offerId && processedIds.has(offerId);\n\n      return !(isProcessedByUrl || isProcessedById);\n    });\n\n    return {\n      ...responseItem,\n      resultats: filteredOffers\n    };\n  })\n  .filter((responseItem) => !Array.isArray(responseItem?.resultats) || responseItem.resultats.length > 0);\n\nreturn [\n  {\n    json: {\n      results: filteredResults\n    },\n    pairedItem: {\n      item: 0\n    }\n  }\n];"
+      },
+      "id": "b2ef2972-fc15-4401-b7da-4a4140bcc882",
+      "name": "Remove already processed jobs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1648,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $('🧩 Build GitHub Branch Payload').item.json.githubOwner }}/{{ $('🧩 Build GitHub Branch Payload').item.json.githubRepo }}/git/ref/heads/{{ $('🧩 Build GitHub Branch Payload').item.json.baseBranch }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('🧩 Build GitHub Branch Payload').item.json.token }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            },
+            {
+              "name": "User-Agent",
+              "value": "n8n-job-application-assistant"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "04d8fd3c-c577-4164-9e20-5c92590c37e1",
+      "name": "🐙 GitHub: Get Base Ref",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        3616,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.github.com/repos/{{ $('🧩 Build GitHub Branch Payload').item.json.githubOwner }}/{{ $('🧩 Build GitHub Branch Payload').item.json.githubRepo }}/git/refs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('🧩 Build GitHub Branch Payload').item.json.token }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            },
+            {
+              "name": "User-Agent",
+              "value": "n8n-job-application-assistant"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"ref\": \"refs/heads/{{ $('🧩 Build GitHub Branch Payload').item.json.branchName }}\",\n  \"sha\": \"{{ $('🐙 GitHub: Get Base Ref').item.json.object.sha }}\"\n}",
+        "options": {}
+      },
+      "id": "2f7356c2-73c1-4fa4-bc8f-45a046499ec1",
+      "name": "🐙 GitHub: Create Branch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        4064,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $('🧩 Build GitHub Branch Payload').item.json.githubOwner }}/{{ $('🧩 Build GitHub Branch Payload').item.json.githubRepo }}/contents/{{ $('🧩 Build GitHub Branch Payload').item.json.filePath }}?ref={{ $('🧩 Build GitHub Branch Payload').item.json.branchName }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('🧩 Build GitHub Branch Payload').item.json.token }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            },
+            {
+              "name": "User-Agent",
+              "value": "n8n-job-application-assistant"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a4ab7577-50a6-4000-8d49-6c8aa1962d44",
+      "name": "🐙 GitHub: Get Locale File",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        4288,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const file = $json;\nconst payload = $('🧩 Build GitHub Branch Payload').item.json;\n\nconst decode = (value) => Buffer.from(String(value || '').replace(/\\n/g, ''), 'base64').toString('utf8');\nconst originalYaml = decode(file.content || '');\n\nreturn [{\n  json: {\n    ...payload,\n    previousFileSha: file.sha,\n    originalYaml,\n    originalCharCount: originalYaml.length\n  }\n}];"
+      },
+      "id": "a29147b4-8fae-40a6-9c82-504f41c031a4",
+      "name": "🧩 Prepare YAML CV Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4512,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"adaptedYaml\": {\n      \"type\": \"string\",\n      \"description\": \"Final full YAML content adapted to the target job while preserving structure and approximate text lengths\"\n    }\n  },\n  \"required\": [\n    \"adaptedYaml\"\n  ]\n}",
+        "autoFix": true
+      },
+      "id": "badd9364-10db-49ce-b18f-6ab356af024d",
+      "name": "📋 Parse: Adapted CV YAML",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        4736,
+        576
+      ]
+    },
+    {
+      "parameters": {
+        "agent": "conversationalAgent",
+        "promptType": "define",
+        "text": "=TARGET JOB\n- Company: {{ $('Loop Over Application').item.json.job.company }}\n- Job title: {{ $('Loop Over Application').item.json.job.title }}\n- Job URL: {{ $('Loop Over Application').item.json.job.url }}\n- Why this job matches: {{ $('Loop Over Application').item.json.job.whyMatch }}\n- Job description: {{ $('Loop Over Application').item.json.job.description }}\n\nCURRENT APPLICATION DRAFT\n- Subject: {{ $('✍️ Agent: Generate Application').item.json.output.email_subject }}\n- Letter body: {{ $('✍️ Agent: Generate Application').item.json.output.letter_body }}\n\n\nORIGINAL YAML (full file)\n{{ $('🧩 Prepare YAML CV Context').item.json.originalYaml }}\n\n",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=You are an expert CV writer and resume localization editor. \nYou edit existing CV YAML content for a specific job offer while keeping layout stability and without denaturing the CV.\n\nRules:\n1) Never invent fake experience or fake metrics. \n2) Keep YAML valid and preserve the exact key structure/order as much as possible.\n3) Keep equivalent text lengths in edited fields (target ±15% characters compared to original field) to preserve visual layout.\n4) Prioritize minimal, high-impact wording changes: title under name, short professional summary, key bullet phrasing.\n5) Keep the candidate voice, language and formatting conventions.\n6) Return one clean final YAML only via adaptedYaml without aditional caracters.\n\nCRITICAL CONSTRAINTS\n- Keep YAML hierarchy and keys unchanged.\n- Preserve global style and tone.\n- Prioritize the sub-title modification (under the name), to align with the post. But don't be over specific. If the cv content can be adjusted, do it but be very carefull to not adapt too much, keep original yaml and the context that you have about me as the source of truth concerning my experiences, formations and abilities.\n- Keep very similar character counts per edited field to avoid breaking CV layout.\n- Only adjust wording needed for this specific role (subtitle under name, short summaries, highlighted bullet wording).\n\nReturn only the final adapted YAML in the field adaptedYaml.",
+          "maxIterations": 6
+        }
+      },
+      "id": "9f1cab59-b918-4795-a60e-91a4fda0d510",
+      "name": "🧠 Agent: Adapt CV YAML",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        4736,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $('🧩 Prepare YAML CV Context').item.json;\nconst adaptedYaml = ($json.output?.adaptedYaml ?? '').trim();\nconst finalYaml = adaptedYaml.length > 0 ? `${adaptedYaml}\\n` : `${payload.originalYaml || ''}`;\nconst encodedContent = Buffer.from(finalYaml).toString('base64');\n\nreturn [{\n  json: {\n    ...payload,\n    encodedContent\n  }\n}];"
+      },
+      "id": "19c6cc51-a0d5-410f-843d-92521b5465c4",
+      "name": "🧩 Build Updated YML File",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5104,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://api.github.com/repos/{{ $('🧩 Build Updated YML File').item.json.githubOwner }}/{{ $('🧩 Build Updated YML File').item.json.githubRepo }}/contents/{{ $('🧩 Build Updated YML File').item.json.filePath }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('🧩 Build Updated YML File').item.json.token }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            },
+            {
+              "name": "User-Agent",
+              "value": "n8n-job-application-assistant"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"message\": \"chore(cv): tailor cv wording for {{ $('🧩 Build Updated YML File').item.json.company || 'job' }} - {{ $('🧩 Build Updated YML File').item.json.jobTitle || 'position' }}\",\n  \"content\": \"{{ $('🧩 Build Updated YML File').item.json.encodedContent }}\",\n  \"sha\": \"{{ $('🧩 Build Updated YML File').item.json.previousFileSha }}\",\n  \"branch\": \"{{ $('🧩 Build Updated YML File').item.json.branchName }}\"\n}",
+        "options": {}
+      },
+      "id": "65d9ea49-4ed6-4908-b49f-920775d425e1",
+      "name": "🐙 GitHub: Update Locale File",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        5328,
+        352
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const application = $('✍️ Agent: Generate Application').item.json;\nconst payload = $('🧩 Build GitHub Branch Payload').item.json;\n\nconst responseBody = $json.body ?? $json;\nconst commitSha = responseBody.commit?.sha || responseBody.content?.sha || '';\nconst commitUrl = responseBody.commit?.html_url || '';\nconst updateStatusCode = Number($json.statusCode || 200);\nconst updateConflict = updateStatusCode === 409;\n\nreturn [{\n  json: {\n    ...application,\n    github: {\n      repository: payload.repository,\n      branchName: payload.branchName,\n      commitSha,\n      commitUrl,\n      updateStatusCode,\n      updateConflict\n    },\n    sendTo: payload.sendTo,\n    jobUrl: payload.jobUrl,\n    jobTitle: payload.jobTitle,\n    company: payload.company,\n    branchName: payload.branchName,\n    githubOwner: payload.githubOwner,\n    githubRepo: payload.githubRepo,\n    token: payload.token,\n    pdfPath: payload.pdfPath,\n    targetWorkflowName: payload.targetWorkflowName,\n    pollAttempt: 0,\n    pollIntervalSeconds: payload.pollIntervalSeconds,\n    pollMaxAttempts: payload.pollMaxAttempts\n  }\n}];"
+      },
+      "id": "7977a57e-698f-4cf6-83de-059f6c9f6ed2",
+      "name": "🧩 Build Application + Branch Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5552,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const config = $('⚙️ Configuration1').first().json;\nconst job = $('Loop Over Application').item.json.job ?? {};\nconst output = $json.output ?? {};\n\nconst slugify = (value) => String(value || 'unknown')\n  .normalize('NFD')\n  .replace(/[\\u0300-\\u036f]/g, '')\n  .toLowerCase()\n  .replace(/[^a-z0-9]+/g, '-')\n  .replace(/^-+|-+$/g, '')\n  .slice(0, 40) || 'unknown';\n\nconst companySlug = slugify(job.company || 'company');\nconst titleSlug = slugify(output.job_title || job.title || 'job');\nconst suffix = String($execution.id || Date.now()).slice(-8);\nconst branchName = `cv/${companySlug}-${titleSlug}-${suffix}`;\n\nconst repository = `${config.githubOwner}/${config.githubRepo}`;\nconst filePath = config.githubLocaleFilePath || 'locales/fr.yml';\nconst pdfPath = config.githubPdfPath || 'pdf/cv-fr-light.pdf';\nconst locale = config.targetLanguage || 'fr';\nconst nowIso = new Date().toISOString();\nconst entryKey = `${companySlug}-${titleSlug}-${suffix}`;\n\nreturn [{\n  json: {\n    repository,\n    githubOwner: config.githubOwner,\n    githubRepo: config.githubRepo,\n    baseBranch: config.githubBaseBranch || 'main',\n    branchName,\n    locale,\n    filePath,\n    pdfPath,\n    entryKey,\n    nowIso,\n    sendTo: config.candidateEmail || 'etiennelescot@gmail.com',\n    jobUrl: output.job_url || job.url || '',\n    jobTitle: output.job_title || job.title || '',\n    company: job.company || '',\n    targetWorkflowName: config.githubActionWorkflowName || 'Build and Commit PDFs',\n    pollIntervalSeconds: Number(config.githubActionPollSeconds || 30),\n    pollMaxAttempts: Number(config.githubActionMaxPollAttempts || 20),\n    prDraft: Boolean(config.githubPrDraft),\n    token: config.githubToken || ''\n  }\n}];"
+      },
+      "id": "d8cdb256-a4d9-4e96-8ac9-0180e522fb57",
+      "name": "🧩 Build GitHub Branch Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3392,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $('🧩 Build GitHub Branch Payload').item.json.githubOwner }}/{{ $('🧩 Build GitHub Branch Payload').item.json.githubRepo }}/branches/{{ encodeURIComponent($('🧩 Build GitHub Branch Payload').item.json.branchName) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('🧩 Build GitHub Branch Payload').item.json.token }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            },
+            {
+              "name": "User-Agent",
+              "value": "n8n-job-application-assistant"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7c58ea6f-b84c-4552-ad8a-4260edd4527d",
+      "name": "🐙 GitHub: Check Branch Ref",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        3840,
+        352
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "amount": "={{ $json.pollIntervalSeconds || 30 }}"
+      },
+      "id": "a6cc06e1-cd40-4f81-a3cb-d3915a58f71d",
+      "name": "⏳ Wait: Poll GitHub Action",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        5776,
+        352
+      ],
+      "webhookId": "5550ee52-7c94-4175-a99b-d1c8fea2732d"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $json.githubOwner }}/{{ $json.githubRepo }}/actions/runs?branch={{ encodeURIComponent($json.branchName) }}&event=push&per_page=20",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.token }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            },
+            {
+              "name": "User-Agent",
+              "value": "n8n-job-application-assistant"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d9965f95-d8e3-41b4-ada3-c70086286005",
+      "name": "🐙 GitHub: Get Latest Workflow Run",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        6000,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const context = $('⏳ Wait: Poll GitHub Action').item.json;\nconst runs = Array.isArray($json.workflow_runs) ? $json.workflow_runs : [];\nconst targetWorkflowName = String(context.targetWorkflowName || 'Build and Commit PDFs');\nconst commitSha = String(context.github?.commitSha || context.commitSha || '').toLowerCase();\n\n// Debug: log first 3 runs to understand what API returns\nconst debugRuns = runs.slice(0, 3).map(r => ({\n  name: r.name,\n  status: r.status,\n  conclusion: r.conclusion,\n  head_sha: r.head_sha?.slice(0, 7)\n}));\n\n// Match by workflow name AND commit SHA (most reliable)\nlet matchingRun = null;\n\nif (commitSha) {\n  // Primary: match by name + exact commit SHA\n  matchingRun = runs.find((run) => \n    String(run.name || '') === targetWorkflowName &&\n    String(run.head_sha || '').toLowerCase() === commitSha\n  );\n}\n\n// Fallback: if no SHA match, take most recent run with matching name\nif (!matchingRun) {\n  matchingRun = runs.find((run) => String(run.name || '') === targetWorkflowName);\n}\n\nconst pollAttempt = Number(context.pollAttempt || 0) + 1;\nconst pollMaxAttempts = Number(context.pollMaxAttempts || 20);\nconst completed = matchingRun?.status === 'completed' || pollAttempt >= pollMaxAttempts;\n\nreturn [{\n  json: {\n    ...context,\n    pollAttempt,\n    targetWorkflowName,\n    commitSha: commitSha || 'none',  // For debugging\n    debugRuns,  // For debugging\n    runId: matchingRun?.id ?? '',\n    runStatus: matchingRun?.status ?? 'not_found',\n    runConclusion: matchingRun?.conclusion ?? '',\n    runHtmlUrl: matchingRun?.html_url ?? '',\n    completed\n  }\n}];"
+      },
+      "id": "d4af7513-37a0-4a3f-b550-26db1b1b9ac3",
+      "name": "🧩 Parse Workflow Run Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6224,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ca222af8-0949-4104-9810-dd2f88fce878",
+              "leftValue": "={{ Number($json.completed ? 1 : 0) }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "larger"
+              }
+            },
+            {
+              "id": "9b89e90a-5128-40cb-91b6-d03e81e6a255",
+              "leftValue": "={{ $json.completed }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "386406cf-0bdd-4b5c-abc5-7a46fa79f26f",
+      "name": "🔀 Workflow Run Completed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        6448,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "5bc8a22e-f594-4465-a1f8-c6e9ed39f5c5",
+              "leftValue": "={{ $json.runConclusion }}",
+              "rightValue": "success",
+              "operator": {
+                "type": "string",
+                "operation": "equal"
+              }
+            },
+            {
+              "id": "ace44953-cfec-4630-b545-88c583fee592",
+              "leftValue": "={{ $json.runConclusion }}",
+              "rightValue": "success",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "5de0623f-5179-4a93-aa66-8dc46150279d",
+      "name": "🔀 Workflow Run Succeeded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        6672,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $('🧩 Parse Workflow Run Status').item.json.githubOwner }}/{{ $('🧩 Parse Workflow Run Status').item.json.githubRepo }}/contents/dist/pdf/cv-{{ $('🧩 Parse Workflow Run Status').item.json.locale || 'fr' }}-light.pdf?ref={{ $('🧩 Parse Workflow Run Status').item.json.branchName }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('🧩 Parse Workflow Run Status').item.json.token }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/vnd.github.raw"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            },
+            {
+              "name": "User-Agent",
+              "value": "n8n-job-application-assistant"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "49e74fb2-d9bc-483e-8567-3889cbaabe88",
+      "name": "📥 Download PDF from Repo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        6896,
+        272
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "=https://api.github.com/repos/{{ $('🧩 Parse Workflow Run Status').item.json.githubOwner }}/{{ $('🧩 Parse Workflow Run Status').item.json.githubRepo }}/git/refs/heads/{{ $('🧩 Parse Workflow Run Status').item.json.branchName }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('🧩 Parse Workflow Run Status').item.json.token }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            },
+            {
+              "name": "User-Agent",
+              "value": "n8n-job-application-assistant"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b4cb56c8-0160-46a7-b205-de4c08a7d8ac",
+      "name": "🐙 GitHub: Delete Branch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        7792,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "etienne@etiennelescot.fr",
+        "subject": "=✅ Branche GitHub supprimée - {{ $('🧩 Parse Workflow Run Status').item.json.branchName }}",
+        "message": "=<h2>🗑️ Suppression de branche confirmée</h2>\n\n<p>La branche GitHub <strong>{{ $('🧩 Parse Workflow Run Status').item.json.branchName }}</strong> a été supprimée avec succès.</p>\n\n<p><strong>Détails :</strong></p>\n<ul>\n  <li>Repository: {{ $('🧩 Parse Workflow Run Status').item.json.githubOwner }}/{{ $('🧩 Parse Workflow Run Status').item.json.githubRepo }}</li>\n  <li>Branche: {{ $('🧩 Parse Workflow Run Status').item.json.branchName }}</li>\n  <li>Date: {{ $now.format('dd/MM/yyyy HH:mm') }}</li>\n</ul>\n\n<p>Le processus de candidature a été finalisé.</p>",
+        "options": {}
+      },
+      "id": "7228bd76-7696-416b-a4fe-0bcb51fdc3be",
+      "name": "📧 Send: Branch Deletion Confirmation",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        8016,
+        416
+      ],
+      "webhookId": "f09f0fca-17a0-4436-9527-3df379bda9d8",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "6z4EpEOJZDp56mUm",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) {\n  const runUrl = item.json.runHtmlUrl ? ` (<a href=\"${item.json.runHtmlUrl}\">run GitHub Action</a>)` : '';\n  item.json.emailExtraMessage = `⚠️ Aucun PDF personnalisé n'a été trouvé pour cette offre${runUrl}.`;\n\n  const fallbackText = `Aucun PDF personnalisé n'a été généré.\\n\\nOffre: ${item.json.jobUrl || ''}\\nRun: ${item.json.runHtmlUrl || ''}\\n`;\n  const fallbackBase64 = Buffer.from(fallbackText, 'utf8').toString('base64');\n\n  item.binary = item.binary || {};\n  item.binary.data = {\n    data: fallbackBase64,\n    mimeType: 'text/plain',\n    fileName: 'pdf-not-available.txt'\n  };\n}\n\nreturn $input.all();"
+      },
+      "id": "5880b598-12dd-45fb-b126-4074524e2dd1",
+      "name": "No PDF",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7120,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) {\n  const conclusion = item.json.runConclusion || 'unknown';\n  const runUrl = item.json.runHtmlUrl ? ` (<a href=\"${item.json.runHtmlUrl}\">run GitHub Action</a>)` : '';\n  item.json.emailExtraMessage = `❌ Le workflow GitHub Action a échoué (conclusion: ${conclusion})${runUrl}.`;\n\n  const fallbackText = `Le workflow GitHub Action a échoué (${conclusion}).\\n\\nOffre: ${item.json.jobUrl || ''}\\nRun: ${item.json.runHtmlUrl || ''}\\n`;\n  const fallbackBase64 = Buffer.from(fallbackText, 'utf8').toString('base64');\n\n  item.binary = item.binary || {};\n  item.binary.data = {\n    data: fallbackBase64,\n    mimeType: 'text/plain',\n    fileName: 'pdf-generation-error.txt'\n  };\n}\n\nreturn $input.all();"
+      },
+      "id": "7d9fff67-072f-4259-b464-f690e26a5e2e",
+      "name": "No PDF Github Action Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7120,
+        496
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "🕘 Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "⚙️ Configuration1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📦 Aggregate: Profile Sources": {
+      "main": [
+        [
+          {
+            "node": "🎯 Agent: Profile Generation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⚙️ Configuration1": {
+      "main": [
+        [
+          {
+            "node": "🧾 Build Profile Sources",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🧾 Build Selected Jobs Source": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Application",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🧾 Build Search Urls": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Job results responses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔎 Agent: Search Urls generation": {
+      "main": [
+        [
+          {
+            "node": "🧾 Build Search Urls",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🎯 Agent: Profile Generation": {
+      "main": [
+        [
+          {
+            "node": "🔎 Agent: Search Urls generation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🧾 Build Profile Sources": {
+      "main": [
+        [
+          {
+            "node": "Loop Over profile sources",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📖 Jina: Read Profile Source": {
+      "main": [
+        [
+          {
+            "node": "Loop Over profile sources",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over profile sources": {
+      "main": [
+        [
+          {
+            "node": "📦 Aggregate: Profile Sources",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "📖 Jina: Read Profile Source",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔎 Agent: Jobs selection": {
+      "main": [
+        [
+          {
+            "node": "🧾 Build Selected Jobs Source",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📦 Aggregate: Jobs": {
+      "main": [
+        [
+          {
+            "node": "Get already processed jobs urls",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get job results": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Job results responses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Job results responses": {
+      "main": [
+        [
+          {
+            "node": "📦 Aggregate: Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get job results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Application": {
+      "main": [
+        [
+          {
+            "node": "📦 Aggregate: Job Applications",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "✍️ Agent: Generate Application",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "✍️ Agent: Generate Application": {
+      "main": [
+        [
+          {
+            "node": "🧩 Build GitHub Branch Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🐙 GitHub: Get Base Ref": {
+      "main": [
+        [
+          {
+            "node": "🐙 GitHub: Check Branch Ref",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🐙 GitHub: Check Branch Ref": {
+      "main": [
+        [
+          {
+            "node": "🐙 GitHub: Get Locale File",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "🐙 GitHub: Create Branch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🐙 GitHub: Create Branch": {
+      "main": [
+        [
+          {
+            "node": "🐙 GitHub: Get Locale File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🐙 GitHub: Get Locale File": {
+      "main": [
+        [
+          {
+            "node": "🧩 Prepare YAML CV Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🧩 Prepare YAML CV Context": {
+      "main": [
+        [
+          {
+            "node": "🧠 Agent: Adapt CV YAML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🧠 Agent: Adapt CV YAML": {
+      "main": [
+        [
+          {
+            "node": "🧩 Build Updated YML File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🧩 Build Updated YML File": {
+      "main": [
+        [
+          {
+            "node": "🐙 GitHub: Update Locale File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🐙 GitHub: Update Locale File": {
+      "main": [
+        [
+          {
+            "node": "🧩 Build Application + Branch Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📧 Send: Application Output": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        [
+          {
+            "node": "🐙 GitHub: Delete Branch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get already processed jobs urls": {
+      "main": [
+        [
+          {
+            "node": "Remove already processed jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove already processed jobs": {
+      "main": [
+        [
+          {
+            "node": "🔎 Agent: Jobs selection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🧩 Build Application + Branch Output": {
+      "main": [
+        [
+          {
+            "node": "⏳ Wait: Poll GitHub Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🧩 Build GitHub Branch Payload": {
+      "main": [
+        [
+          {
+            "node": "🐙 GitHub: Get Base Ref",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⏳ Wait: Poll GitHub Action": {
+      "main": [
+        [
+          {
+            "node": "🐙 GitHub: Get Latest Workflow Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🐙 GitHub: Get Latest Workflow Run": {
+      "main": [
+        [
+          {
+            "node": "🧩 Parse Workflow Run Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🧩 Parse Workflow Run Status": {
+      "main": [
+        [
+          {
+            "node": "🔀 Workflow Run Completed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔀 Workflow Run Completed?": {
+      "main": [
+        [
+          {
+            "node": "🔀 Workflow Run Succeeded?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "⏳ Wait: Poll GitHub Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔀 Workflow Run Succeeded?": {
+      "main": [
+        [
+          {
+            "node": "📥 Download PDF from Repo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No PDF Github Action Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🐙 GitHub: Delete Branch": {
+      "main": [
+        [
+          {
+            "node": "📧 Send: Branch Deletion Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📧 Send: Branch Deletion Confirmation": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Application",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No PDF": {
+      "main": [
+        [
+          {
+            "node": "📧 Send: Application Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No PDF Github Action Error": {
+      "main": [
+        [
+          {
+            "node": "📧 Send: Application Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📥 Download PDF from Repo": {
+      "main": [
+        [
+          {
+            "node": "📧 Send: Application Output",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "💾 Memory: Profile Intelligence1": {
+      "ai_memory": [
+        [
+          {
+            "node": "🎯 Agent: Profile Generation",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📋 Parse: Profile Intelligence1": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "🎯 Agent: Profile Generation",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "💾 Memory: Profile Intelligence": {
+      "ai_memory": [
+        [
+          {
+            "node": "🔎 Agent: Search Urls generation",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "🔎 Agent: Search Urls generation",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "💾 Memory: Search Indeed": {
+      "ai_memory": [
+        [
+          {
+            "node": "🔎 Agent: Jobs selection",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📋 Parse: Search Results": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "🔎 Agent: Jobs selection",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "📋 Parse: Application Pack",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "✍️ Agent: Generate Application",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "📋 Parse: Adapted CV YAML",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "🧠 Agent: Adapt CV YAML",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "📋 Parse: Search Results",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "🔎 Agent: Jobs selection",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "🔎 Agent: Search Urls generation",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "🎯 Agent: Profile Generation",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📋 Parse: Application Pack": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "✍️ Agent: Generate Application",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "💾 Memory: Application Pack": {
+      "ai_memory": [
+        [
+          {
+            "node": "✍️ Agent: Generate Application",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📋 Parse: Adapted CV YAML": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "🧠 Agent: Adapt CV YAML",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed"
+  },
+  "versionId": "9782da5d-31aa-4f50-bb87-ca90241a7267",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "edd25271aa625c76cdf6d84b2348166a32e5f283c2b13fa889b33e5c5a59d611"
+  },
+  "id": "G9GXzwX97XBKAwcj",
+  "tags": []
+}
