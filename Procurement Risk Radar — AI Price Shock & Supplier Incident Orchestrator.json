@@ -1,0 +1,1068 @@
+{
+  "name": "Procurement Risk Radar — AI Price Shock & Supplier Incident Orchestrator",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "labelIds": [
+            "INBOX"
+          ],
+          "q": "newer_than:3d (supplier OR vendor OR purchase order OR quote OR lead time OR surcharge OR tariff OR MOQ OR replenishment)"
+        },
+        "options": {}
+      },
+      "id": "367e2b61-087a-4913-96e4-8b593cd73091",
+      "name": "Supplier Inbox Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        64,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "procurement-risk-radar/supplier-signal",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "ababbc6c-9243-4d85-b1ad-cefe707abc8f",
+      "name": "Supplier Portal Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        64,
+        368
+      ],
+      "webhookId": "fc16120e-5320-401e-9865-11f5c4db5967"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { accepted: true, workflow: \"Procurement Risk Radar\", receivedAt: $now } }}",
+        "options": {
+          "responseCode": 202
+        }
+      },
+      "id": "6166e11a-449d-49fa-8d9d-be4c78e032f1",
+      "name": "Acknowledge Portal Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        288,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 12
+            }
+          ]
+        }
+      },
+      "id": "55e33acc-4e99-4f9a-ab6f-74a9e5c59cba",
+      "name": "Daily Contract Sweep",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        288,
+        512
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "d1f4fb6c-9da8-4612-bf1a-43be14e7c866",
+      "name": "Merge Email and Webhook",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        288,
+        128
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "d8c9c877-2af5-4ad4-b1f7-bb3c396ec09a",
+      "name": "Merge All Signals",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        512,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const body = $json.body ?? $json;\nconst sourceType = $json.headers ? 'supplier_portal_webhook' : ($json.labelIds ? 'gmail_supplier_email' : 'scheduled_contract_sweep');\nconst attachments = $json.attachments ?? body.attachments ?? [];\nconst firstAttachment = attachments[0] ?? {};\nconst subject = $json.subject ?? body.subject ?? body.alertType ?? 'Supplier update';\nconst textParts = [\n  $json.textPlain,\n  $json.snippet,\n  body.message,\n  body.summary,\n  body.notes,\n  JSON.stringify(body),\n].filter(Boolean);\nconst text = textParts.join('\n\n');\nconst vendorName = body.vendorName ?? body.supplierName ?? $json.from?.name ?? $json.from?.email ?? 'Unknown supplier';\nconst sku = body.sku ?? body.itemSku ?? body.productCode ?? 'unknown-sku';\nconst stockOnHand = Number(body.stockOnHand ?? body.inventoryOnHand ?? body.qtyOnHand ?? 0);\nconst avgDailyDemand = Number(body.avgDailyDemand ?? body.salesVelocity ?? 3);\nconst daysOfCover = avgDailyDemand > 0 ? Number((stockOnHand / avgDailyDemand).toFixed(1)) : 999;\nreturn {\n  json: {\n    sourceType,\n    receivedAt: new Date().toISOString(),\n    vendorName,\n    vendorEmail: $json.from?.email ?? body.vendorEmail ?? 'vendor@example.com',\n    subject,\n    text,\n    sku,\n    itemName: body.itemName ?? body.productName ?? 'Critical stocked item',\n    currentUnitCost: Number(body.currentUnitCost ?? body.previousUnitCost ?? 42),\n    quotedUnitCost: Number(body.quotedUnitCost ?? body.newUnitCost ?? body.proposedCost ?? 45),\n    currentLeadTimeDays: Number(body.currentLeadTimeDays ?? body.previousLeadTimeDays ?? 14),\n    quotedLeadTimeDays: Number(body.quotedLeadTimeDays ?? body.newLeadTimeDays ?? body.proposedLeadTimeDays ?? 21),\n    currentMoq: Number(body.currentMoq ?? 100),\n    quotedMoq: Number(body.quotedMoq ?? body.newMoq ?? 150),\n    effectiveDate: body.effectiveDate ?? $today.plus({ days: 7 }).toISODate(),\n    stockOnHand,\n    avgDailyDemand,\n    daysOfCover,\n    monthlyVolume: Number(body.monthlyVolume ?? 300),\n    fallbackSuppliers: Number(body.fallbackSuppliers ?? 1),\n    strategicItem: Boolean(body.strategicItem ?? true),\n    onContract: Boolean(body.onContract ?? true),\n    openPoValue: Number(body.openPoValue ?? 12500),\n    binary: {\n      attachmentProperty: Object.keys($binary ?? {})[0] ?? null,\n      attachmentFileName: firstAttachment.filename ?? firstAttachment.fileName ?? null,\n      attachmentMimeType: firstAttachment.mimeType ?? null,\n    },\n  },\n};"
+      },
+      "id": "67bceebc-71d4-425c-be16-dbe1e411b816",
+      "name": "Normalize Supplier Signal",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        736,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "binaryPropertyName": "={{ $json.binary?.attachmentProperty || \"data\" }}"
+      },
+      "id": "a9f9fcaf-c59c-4a51-a26a-65a8ff6732df",
+      "name": "Read PDF Attachment",
+      "type": "n8n-nodes-base.readPDF",
+      "typeVersion": 1,
+      "position": [
+        960,
+        392
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "28ba7bbb-341c-48b1-b880-9cd5eb89c2d3",
+      "name": "Merge Normalized and PDF",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1184,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const pdfText = $json.text ?? $json.data ?? '';\nconst context = {\n  vendorName: $json.vendorName,\n  sku: $json.sku,\n  itemName: $json.itemName,\n  currentUnitCost: $json.currentUnitCost,\n  quotedUnitCost: $json.quotedUnitCost,\n  currentLeadTimeDays: $json.currentLeadTimeDays,\n  quotedLeadTimeDays: $json.quotedLeadTimeDays,\n  currentMoq: $json.currentMoq,\n  quotedMoq: $json.quotedMoq,\n  effectiveDate: $json.effectiveDate,\n};\nreturn {\n  json: {\n    ...$json,\n    extractionText: [\n      'Normalize this supplier update into structured procurement change data.',\n      'Known context: ' + JSON.stringify(context),\n      'Supplier message:',\n      $json.text || '',\n      'PDF text:',\n      pdfText,\n    ].join('\n\n'),\n  },\n};"
+      },
+      "id": "1fa4cda4-419b-4de8-a7b4-33ceadfac98b",
+      "name": "Build Extraction Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1408,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "text": "={{ $json.extractionText }}",
+        "schemaType": "manual",
+        "inputSchema": "={\n  \"type\": \"object\",\n  \"properties\": {\n    \"changeType\": { \"type\": \"string\" },\n    \"supplierName\": { \"type\": \"string\" },\n    \"sku\": { \"type\": \"string\" },\n    \"priceDeltaPct\": { \"type\": \"number\" },\n    \"leadTimeDeltaDays\": { \"type\": \"number\" },\n    \"moqDelta\": { \"type\": \"number\" },\n    \"confidence\": { \"type\": \"number\" },\n    \"reason\": { \"type\": \"string\" },\n    \"recommendedAction\": { \"type\": \"string\" }\n  },\n  \"required\": [\"changeType\", \"supplierName\", \"sku\", \"confidence\"]\n}",
+        "options": {}
+      },
+      "id": "b20cd420-ac04-402c-885e-3f04a0583a50",
+      "name": "Supplier Change Extractor",
+      "type": "@n8n/n8n-nodes-langchain.informationExtractor",
+      "typeVersion": 1.2,
+      "position": [
+        1632,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "id": "92ab8808-ab21-4f37-9b67-9c143eade386",
+      "name": "Extraction Llm",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1704,
+        544
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "OPENAI_CREDENTIAL_ID",
+          "name": "OpenAI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const e = $json;\nconst quotedUnitCost = Number(e.quotedUnitCost ?? e.currentUnitCost ?? 0);\nconst currentUnitCost = Number(e.currentUnitCost ?? 0);\nconst monthlyVolume = Number(e.monthlyVolume ?? 0);\nconst priceDeltaPct = e.priceDeltaPct ?? (currentUnitCost > 0 ? Number((((quotedUnitCost - currentUnitCost) / currentUnitCost) * 100).toFixed(2)) : 0);\nconst leadTimeDeltaDays = e.leadTimeDeltaDays ?? (Number(e.quotedLeadTimeDays ?? 0) - Number(e.currentLeadTimeDays ?? 0));\nconst moqDelta = e.moqDelta ?? (Number(e.quotedMoq ?? 0) - Number(e.currentMoq ?? 0));\nconst stockoutRisk = e.daysOfCover <= 7 ? 30 : e.daysOfCover <= 14 ? 18 : 6;\nconst concentrationRisk = e.fallbackSuppliers === 0 ? 25 : e.fallbackSuppliers === 1 ? 16 : 6;\nconst strategicRisk = e.strategicItem ? 14 : 4;\nconst priceRisk = priceDeltaPct >= 12 ? 28 : priceDeltaPct >= 7 ? 18 : priceDeltaPct >= 3 ? 10 : 2;\nconst leadTimeRisk = leadTimeDeltaDays >= 14 ? 22 : leadTimeDeltaDays >= 7 ? 14 : leadTimeDeltaDays > 0 ? 8 : 0;\nconst moqRisk = moqDelta >= 500 ? 12 : moqDelta >= 100 ? 7 : moqDelta > 0 ? 3 : 0;\nconst estimatedMonthlyMarginImpact = Number(((quotedUnitCost - currentUnitCost) * monthlyVolume).toFixed(2));\nlet riskScore = priceRisk + leadTimeRisk + moqRisk + stockoutRisk + concentrationRisk + strategicRisk;\nriskScore = Math.max(0, Math.min(100, riskScore));\nlet riskLane = 'low';\nif (riskScore >= 75 || estimatedMonthlyMarginImpact >= 5000 || stockoutRisk >= 30) riskLane = 'critical';\nelse if (riskScore >= 45 || estimatedMonthlyMarginImpact >= 1500) riskLane = 'review';\nconst incidentId = 'PRI-' + Date.now() + '-' + String(e.sku || 'SKU').replace(/[^A-Z0-9]/gi, '').slice(0, 6).toUpperCase();\nreturn {\n  json: {\n    ...e,\n    priceDeltaPct,\n    leadTimeDeltaDays,\n    moqDelta,\n    estimatedMonthlyMarginImpact,\n    riskScore,\n    riskLane,\n    incidentId,\n    buyerRecommendation: riskLane === 'critical'\n      ? 'Escalate immediately, freeze affected PO changes, request backup quote.'\n      : riskLane === 'review'\n      ? 'Open approval task and compare fallback supplier options within SLA.'\n      : 'Log for digest and monitor next supplier update.',\n    decisionSlaHours: riskLane === 'critical' ? 2 : riskLane === 'review' ? 12 : 48,\n  },\n};"
+      },
+      "id": "02448bd3-c80a-46a2-a413-d25e263f0c4a",
+      "name": "Resolve Procurement Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1984,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.riskLane }}",
+                    "rightValue": "low",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "low-lane"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "low_risk"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.riskLane }}",
+                    "rightValue": "review",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "review-lane"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "review_required"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.riskLane }}",
+                    "rightValue": "critical",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "critical-lane"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "critical_incident"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5adeb154-8e25-45cb-83cc-7efc81ae99bd",
+      "name": "Route By Risk Lane",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        2208,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "mode": "id",
+          "value": "={{ $env.AIRTABLE_PROCUREMENT_BASE_ID || \"\" }}"
+        },
+        "table": {
+          "mode": "id",
+          "value": "={{ $env.AIRTABLE_SUPPLIER_EVENTS_TABLE_ID || \"\" }}"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "IncidentId": "={{ $json.incidentId }}",
+            "Vendor": "={{ $json.vendorName }}",
+            "SKU": "={{ $json.sku }}",
+            "RiskLane": "={{ $json.riskLane }}",
+            "RiskScore": "={{ $json.riskScore }}",
+            "RecommendedAction": "={{ $json.buyerRecommendation }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "c4ac1aa2-c8c8-40f3-8b45-6799ca9a0d4b",
+      "name": "Log Low Risk Event",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        3776,
+        128
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "AIRTABLE_CREDENTIAL_ID",
+          "name": "Airtable Procurement Ops"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "mode": "id",
+          "value": "={{ $env.SLACK_PROCUREMENT_CHANNEL_ID || \"\" }}"
+        },
+        "text": "={{ `🟡 Procurement review needed\nIncident: ${$json.incidentId}\nSupplier: ${$json.vendorName}\nSKU: ${$json.sku}\nRisk score: ${$json.riskScore}\nMargin impact est.: $${$json.estimatedMonthlyMarginImpact}\nRecommendation: ${$json.buyerRecommendation}` }}",
+        "otherOptions": {}
+      },
+      "id": "9923c317-5740-40cf-a21e-4e22bdb31e66",
+      "name": "Notify Buyer Digest Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        2432,
+        320
+      ],
+      "webhookId": "3f14cc85-4846-4184-818e-c02d5d863a4b",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "SLACK_CREDENTIAL_ID",
+          "name": "Slack"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "mode": "id",
+          "value": "={{ $env.AIRTABLE_PROCUREMENT_BASE_ID || \"\" }}"
+        },
+        "table": {
+          "mode": "id",
+          "value": "={{ $env.AIRTABLE_INCIDENTS_TABLE_ID || \"\" }}"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "IncidentId": "={{ $json.incidentId }}",
+            "Vendor": "={{ $json.vendorName }}",
+            "SKU": "={{ $json.sku }}",
+            "RiskLane": "={{ $json.riskLane }}",
+            "RiskScore": "={{ $json.riskScore }}",
+            "EstimatedMonthlyMarginImpact": "={{ $json.estimatedMonthlyMarginImpact }}",
+            "BuyerRecommendation": "={{ $json.buyerRecommendation }}",
+            "Status": "open"
+          }
+        },
+        "options": {}
+      },
+      "id": "bdbc43b0-596d-4d8d-8002-bc66a260dd7f",
+      "name": "Open Risk Incident",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        2656,
+        416
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "AIRTABLE_CREDENTIAL_ID",
+          "name": "Airtable Procurement Ops"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "mode": "id",
+          "value": "={{ $env.SLACK_PROCUREMENT_WAR_ROOM_CHANNEL_ID || \"\" }}"
+        },
+        "text": "={{ `🔴 Critical procurement incident\nIncident: ${$json.incidentId}\nSupplier: ${$json.vendorName}\nSKU: ${$json.sku}\nPrice delta: ${$json.priceDeltaPct}%\nLead time delta: ${$json.leadTimeDeltaDays} days\nDays of cover: ${$json.daysOfCover}\nAction now: ${$json.buyerRecommendation}` }}",
+        "otherOptions": {}
+      },
+      "id": "52ca663d-32e3-4159-a400-d5c3b8a61c94",
+      "name": "Notify Ops War Room",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        2432,
+        512
+      ],
+      "webhookId": "31994d39-8080-429c-bee0-47139297814f",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "SLACK_CREDENTIAL_ID",
+          "name": "Slack"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "mode": "id",
+          "value": "={{ $env.SLACK_PROCUREMENT_CHANNEL_ID || \"\" }}"
+        },
+        "text": "={{ `Buyer decision required for ${$json.incidentId}\nSupplier: ${$json.vendorName}\nSKU: ${$json.sku}\nOpen the wait form from the execution to approve backup sourcing, request repricing, or reject.` }}",
+        "otherOptions": {}
+      },
+      "id": "a2ed561e-7de9-4462-a5a3-1f31a1c98e83",
+      "name": "Request Buyer Approval",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        2880,
+        416
+      ],
+      "webhookId": "acac51ce-11f1-4f64-90ca-02b3dc306ecd",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "SLACK_CREDENTIAL_ID",
+          "name": "Slack"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resume": "form",
+        "formTitle": "Procurement incident decision",
+        "formDescription": "Approve backup sourcing, request repricing, or reject and escalate.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Decision",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "approve_backup_sourcing"
+                  },
+                  {
+                    "option": "request_reprice"
+                  },
+                  {
+                    "option": "reject_and_escalate"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Decision notes",
+              "fieldType": "textarea"
+            }
+          ]
+        },
+        "limitWaitTime": true,
+        "resumeAmount": 12,
+        "options": {}
+      },
+      "id": "7bba6595-f9cc-491a-9c9b-73db9a2b1441",
+      "name": "Wait For Buyer Decision",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        3104,
+        416
+      ],
+      "webhookId": "41c49452-1120-4dfe-9fcd-f7eea426d6c6"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.decision || $json.form?.decision || \"approve_backup_sourcing\" }}",
+                    "rightValue": "approve_backup_sourcing",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "approved"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "approved"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.decision || $json.form?.decision || \"\" }}",
+                    "rightValue": "reject_and_escalate",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "rejected"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "rejected"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "59e5dd83-6499-4e2a-9266-0c04521c1482",
+      "name": "Route Buyer Decision",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        3328,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "mode": "id",
+          "value": "={{ $env.AIRTABLE_PROCUREMENT_BASE_ID || \"\" }}"
+        },
+        "table": {
+          "mode": "id",
+          "value": "={{ $env.AIRTABLE_TASKS_TABLE_ID || \"\" }}"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "IncidentId": "={{ $json.incidentId }}",
+            "TaskType": "backup_sourcing",
+            "Owner": "buyer-on-duty",
+            "DueInHours": "={{ $json.decisionSlaHours }}",
+            "Notes": "={{ $json.decision_notes || $json.form?.decision_notes || $json.buyerRecommendation }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "6a85656e-3618-49ce-b642-f3df33c7cd52",
+      "name": "Create Backup Sourcing Task",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        3552,
+        320
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "AIRTABLE_CREDENTIAL_ID",
+          "name": "Airtable Procurement Ops"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $env.PROCUREMENT_OWNER_EMAIL || \"owner@example.com\" }}",
+        "subject": "={{ `Escalation required: ${$json.incidentId} procurement decision rejected` }}",
+        "emailType": "text",
+        "message": "={{ `A procurement risk decision was rejected or timed out.\n\nIncident: ${$json.incidentId}\nSupplier: ${$json.vendorName}\nSKU: ${$json.sku}\nRisk score: ${$json.riskScore}\nNotes: ${$json.decision_notes || $json.form?.decision_notes || \"No notes\"}` }}",
+        "options": {}
+      },
+      "id": "79f91769-117d-49ac-aace-abe3b5fbc685",
+      "name": "Escalate Rejected Decision",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        3776,
+        512
+      ],
+      "webhookId": "0418b07f-d0d9-468d-9c04-7ca29890f8c8",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "GMAIL_CREDENTIAL_ID",
+          "name": "Gmail"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "mode": "id",
+          "value": "={{ $env.AIRTABLE_PROCUREMENT_BASE_ID || \"\" }}"
+        },
+        "table": {
+          "mode": "id",
+          "value": "={{ $env.AIRTABLE_DECISIONS_TABLE_ID || \"\" }}"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "IncidentId": "={{ $json.incidentId }}",
+            "Decision": "approved_backup_sourcing",
+            "DecisionNotes": "={{ $json.decision_notes || $json.form?.decision_notes || \"Approved\" }}",
+            "BuyerRecommendation": "={{ $json.buyerRecommendation }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "866a6186-0827-468d-8742-451c3b6f8d0f",
+      "name": "Finalize Approved Action",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        3776,
+        320
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "AIRTABLE_CREDENTIAL_ID",
+          "name": "Airtable Procurement Ops"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "mode": "id",
+          "value": "={{ $env.AIRTABLE_PROCUREMENT_BASE_ID || \"\" }}"
+        },
+        "table": {
+          "mode": "id",
+          "value": "={{ $env.AIRTABLE_AUDIT_TABLE_ID || \"\" }}"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "IncidentId": "={{ $json.incidentId }}",
+            "EventType": "supplier_change_processed",
+            "RiskLane": "={{ $json.riskLane }}",
+            "Decision": "={{ $json.decision || $json.form?.decision || \"logged\" }}",
+            "Snapshot": "={{ JSON.stringify($json) }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "d1fa5bd0-784e-49b2-a5d2-902f0b5af40a",
+      "name": "Push Supplier Event Audit",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        4000,
+        320
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "AIRTABLE_CREDENTIAL_ID",
+          "name": "Airtable Procurement Ops"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "bc3aab35-68c5-4893-a134-49af7556ac24",
+      "name": "Failure Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        64,
+        736
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "mode": "id",
+          "value": "={{ $env.SLACK_PROCUREMENT_WAR_ROOM_CHANNEL_ID || \"\" }}"
+        },
+        "text": "={{ `❌ Procurement Risk Radar failure\nWorkflow: ${$json.workflow?.name || \"unknown\"}\nNode: ${$json.execution?.lastNodeExecuted || \"unknown\"}\nError: ${$json.execution?.error?.message || $json.error?.message || \"unknown\"}` }}",
+        "otherOptions": {}
+      },
+      "id": "74238f80-d8ab-4cd7-90a0-bee3c5ca34f7",
+      "name": "Failure Alert Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        288,
+        736
+      ],
+      "webhookId": "5a980034-b142-4ffd-8057-68528e525c13",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "SLACK_CREDENTIAL_ID",
+          "name": "Slack"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Supplier Inbox Trigger": {
+      "main": [
+        [
+          {
+            "node": "Merge Email and Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supplier Portal Webhook": {
+      "main": [
+        [
+          {
+            "node": "Acknowledge Portal Webhook",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Email and Webhook",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Email and Webhook": {
+      "main": [
+        [
+          {
+            "node": "Merge All Signals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily Contract Sweep": {
+      "main": [
+        [
+          {
+            "node": "Merge All Signals",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge All Signals": {
+      "main": [
+        [
+          {
+            "node": "Normalize Supplier Signal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Supplier Signal": {
+      "main": [
+        [
+          {
+            "node": "Read PDF Attachment",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Normalized and PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read PDF Attachment": {
+      "main": [
+        [
+          {
+            "node": "Merge Normalized and PDF",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Normalized and PDF": {
+      "main": [
+        [
+          {
+            "node": "Build Extraction Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Extraction Payload": {
+      "main": [
+        [
+          {
+            "node": "Supplier Change Extractor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supplier Change Extractor": {
+      "main": [
+        [
+          {
+            "node": "Resolve Procurement Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Procurement Context": {
+      "main": [
+        [
+          {
+            "node": "Route By Risk Lane",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route By Risk Lane": {
+      "main": [
+        [
+          {
+            "node": "Log Low Risk Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Buyer Digest Slack",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Ops War Room",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Low Risk Event": {
+      "main": [
+        [
+          {
+            "node": "Push Supplier Event Audit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Buyer Digest Slack": {
+      "main": [
+        [
+          {
+            "node": "Open Risk Incident",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Open Risk Incident": {
+      "main": [
+        [
+          {
+            "node": "Request Buyer Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Request Buyer Approval": {
+      "main": [
+        [
+          {
+            "node": "Wait For Buyer Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait For Buyer Decision": {
+      "main": [
+        [
+          {
+            "node": "Route Buyer Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Buyer Decision": {
+      "main": [
+        [
+          {
+            "node": "Create Backup Sourcing Task",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Escalate Rejected Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Backup Sourcing Task": {
+      "main": [
+        [
+          {
+            "node": "Finalize Approved Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Finalize Approved Action": {
+      "main": [
+        [
+          {
+            "node": "Push Supplier Event Audit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escalate Rejected Decision": {
+      "main": [
+        [
+          {
+            "node": "Push Supplier Event Audit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Ops War Room": {
+      "main": [
+        [
+          {
+            "node": "Open Risk Incident",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Failure Trigger": {
+      "main": [
+        [
+          {
+            "node": "Failure Alert Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraction Llm": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Supplier Change Extractor",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timezone": "America/New_York",
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveExecutionProgress": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "94a2928b-ebe1-4f5e-be34-de3171359adb",
+  "meta": {
+    "instanceId": "aabd62c96dbd371d6dc1394d2fb7426505c489738f1013e12bf67b13e5d56f3f"
+  },
+  "id": "uNzGrduCm2v5TzmX",
+  "tags": []
+}

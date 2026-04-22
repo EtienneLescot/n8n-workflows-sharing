@@ -1,0 +1,622 @@
+{
+  "name": "Competitive Intelligence Monitor for E-commerce",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 7
+            }
+          ]
+        }
+      },
+      "id": "73a8b6b9-7fb8-4e33-82ea-b02949264c44",
+      "name": "Daily 7 AM Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "messages": {
+          "message": [
+            {
+              "content": "<__PLACEHOLDER_VALUE__Enter your competitors (e.g., \"Shopify, WooCommerce, BigCommerce\") and your industry (e.g., \"e-commerce platforms\")__>"
+            }
+          ]
+        },
+        "options": {
+          "maxTokens": 2000,
+          "returnRelatedQuestions": true,
+          "searchRecency": "day"
+        },
+        "requestOptions": {}
+      },
+      "id": "ef34269e-cb40-4618-af94-dd97a9bbd208",
+      "name": "Fetch Competitor Intelligence",
+      "type": "n8n-nodes-base.perplexity",
+      "typeVersion": 1,
+      "position": [
+        464,
+        304
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "8a5efac4-0c29-467f-8466-c2dbb146c369",
+      "name": "Combine Intelligence Sources",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        688,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "url": "<__PLACEHOLDER_VALUE__Enter competitor pricing page URL (e.g., https://www.shopify.com/pricing)__>",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text",
+              "outputPropertyName": "pricingHtml"
+            }
+          }
+        }
+      },
+      "id": "f8805e95-69bb-4a3a-a150-190c53ef3dd3",
+      "name": "Fetch Competitor Pricing",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        464,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Analyze this competitive intelligence data and extract structured insights:\n\n{{ $json.choices?.[0]?.message?.content ?? $json.pricingHtml }}\n\nFor each significant development:\n1. Identify the competitor\n2. Categorize as: product_launch, pricing_change, partnership, marketing_campaign, or other\n3. Assign priority: low, medium, high, critical\n4. Calculate impact_score (0-100) based on potential business impact\n5. Provide a concise summary\n6. Explain business implications\n7. Recommend 2-3 specific actions\n8. Determine sentiment: opportunity, threat, or neutral\n9. Note any pricing changes with details",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a competitive intelligence analyst for e-commerce businesses. Analyze competitor developments with a focus on actionable insights, business impact, and strategic recommendations. Be concise but thorough.",
+          "maxIterations": 5
+        }
+      },
+      "id": "ad9fb092-dff0-4abb-8b1d-7eb1343da7cf",
+      "name": "AI Intelligence Analyzer",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        912,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini"
+        },
+        "builtInTools": {},
+        "options": {
+          "maxTokens": 1500,
+          "temperature": 0.2
+        }
+      },
+      "id": "668b99ee-ad90-4886-8dd9-3479e78e28e1",
+      "name": "OpenAI GPT-5 Mini",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        928,
+        624
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "3tpHjeLbkX5PIuNM",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": {
+          "competitor": "Shopify",
+          "category": "product_launch",
+          "priority": "high",
+          "impact_score": 85,
+          "summary": "Brief summary of the development",
+          "business_implications": "What this means for your business",
+          "recommended_actions": [
+            "Action 1",
+            "Action 2"
+          ],
+          "sentiment": "threat",
+          "pricing_change": false,
+          "pricing_details": null
+        }
+      },
+      "id": "8fdc180b-d2f8-4bf1-97d9-643042f818ef",
+      "name": "Intelligence Schema",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1056,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.output.priority }}",
+                    "rightValue": "critical",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Critical"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.output.priority }}",
+                    "rightValue": "high",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "High"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.output.impact_score }}",
+                    "rightValue": 50,
+                    "operator": {
+                      "type": "number",
+                      "operation": "gt"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Medium"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "none"
+        }
+      },
+      "id": "e1f61e2e-0032-4852-a8ca-db851ddd5bd4",
+      "name": "Route by Priority",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1264,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "messageType": "block",
+        "blocksUi": "=[\n  {\n    \"type\": \"header\",\n    \"text\": {\n      \"type\": \"plain_text\",\n      \"text\": \"🚨 {{ $json.output.priority === \\\"critical\\\" ? \\\"CRITICAL\\\" : \\\"HIGH PRIORITY\\\" }} Alert: {{ $json.output.competitor }}\"\n    }\n  },\n  {\n    \"type\": \"section\",\n    \"fields\": [\n      {\n        \"type\": \"mrkdwn\",\n        \"text\": \"*Category:*\\n{{ $json.output.category }}\"\n      },\n      {\n        \"type\": \"mrkdwn\",\n        \"text\": \"*Impact Score:*\\n{{ $json.output.impact_score }}/100\"\n      },\n      {\n        \"type\": \"mrkdwn\",\n        \"text\": \"*Sentiment:*\\n{{ $json.output.sentiment }}\"\n      }\n    ]\n  },\n  {\n    \"type\": \"section\",\n    \"text\": {\n      \"type\": \"mrkdwn\",\n      \"text\": \"*Summary:*\\n{{ $json.output.summary }}\"\n    }\n  },\n  {\n    \"type\": \"section\",\n    \"text\": {\n      \"type\": \"mrkdwn\",\n      \"text\": \"*Business Implications:*\\n{{ $json.output.business_implications }}\"\n    }\n  },\n  {\n    \"type\": \"section\",\n    \"text\": {\n      \"type\": \"mrkdwn\",\n      \"text\": \"*Recommended Actions:*\\n{{ $json.output.recommended_actions.map((action, i) => `${i + 1}. ${action}`).join(\\\"\\\\n\\\") }}\"\n    }\n  }\n]",
+        "text": "=🚨 {{ $json.output.priority === \"critical\" ? \"CRITICAL\" : \"HIGH PRIORITY\" }} Competitive Intelligence Alert",
+        "otherOptions": {}
+      },
+      "id": "0d25ff9d-9bed-468c-a8b8-3e1d4a155ce9",
+      "name": "Urgent Slack Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1488,
+        336
+      ],
+      "webhookId": "382d7b29-a61d-46a4-a093-6be4b293d44b"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "competitor",
+              "keyValue": "={{ $('AI Intelligence Analyzer').item.json.output.competitor }}"
+            },
+            {
+              "keyName": "summary",
+              "keyValue": "={{ $('AI Intelligence Analyzer').item.json.output.summary }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "competitor": "={{ $('AI Intelligence Analyzer').item.json.output.competitor }}",
+            "category": "={{ $('AI Intelligence Analyzer').item.json.output.category }}",
+            "priority": "={{ $('AI Intelligence Analyzer').item.json.output.priority }}",
+            "impact_score": "={{ $('AI Intelligence Analyzer').item.json.output.impact_score }}",
+            "summary": "={{ $('AI Intelligence Analyzer').item.json.output.summary }}",
+            "business_implications": "={{ $('AI Intelligence Analyzer').item.json.output.business_implications }}",
+            "recommended_actions": "={{ JSON.stringify($('AI Intelligence Analyzer').item.json.output.recommended_actions) }}",
+            "sentiment": "={{ $('AI Intelligence Analyzer').item.json.output.sentiment }}",
+            "pricing_change": "={{ $('AI Intelligence Analyzer').item.json.output.pricing_change }}",
+            "pricing_details": "={{ $('AI Intelligence Analyzer').item.json.output.pricing_details }}",
+            "detected_date": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "0e92becb-fcf6-4053-97ea-42e5c6b3ed76",
+      "name": "Store in Intelligence Database",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1712,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "detected_date",
+              "condition": "gte",
+              "keyValue": "={{ $now.minus({ days: 30 }).toISO() }}"
+            }
+          ]
+        },
+        "returnAll": true,
+        "orderBy": true,
+        "orderByColumn": "detected_date"
+      },
+      "id": "36952705-9dd0-4da6-be5a-30cc7e62d784",
+      "name": "Get Last 30 Days Data",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1936,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "fieldsToSummarize": {
+          "values": [
+            {
+              "field": "competitor"
+            },
+            {
+              "aggregation": "average",
+              "field": "impact_score"
+            },
+            {
+              "aggregation": "countUnique",
+              "field": "category"
+            }
+          ]
+        },
+        "options": {
+          "outputFormat": "singleItem"
+        }
+      },
+      "id": "cd0d9083-2e41-40dc-bba3-b8c6471fdd92",
+      "name": "Analyze Trends",
+      "type": "n8n-nodes-base.summarize",
+      "typeVersion": 1.1,
+      "position": [
+        2160,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "sortFieldsUi": {
+          "sortField": [
+            {
+              "fieldName": "count_competitor",
+              "order": "descending"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f291aff4-58f6-4ae3-af82-7acb54ebdd0e",
+      "name": "Sort by Activity",
+      "type": "n8n-nodes-base.sort",
+      "typeVersion": 1,
+      "position": [
+        2384,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "<__PLACEHOLDER_VALUE__Enter recipient email (e.g., ceo@yourcompany.com)__>",
+        "subject": "=Daily Competitive Intelligence Digest - {{ $now.toFormat(\"MMMM d, yyyy\") }}",
+        "message": "=<html>\n<head><style>\n  body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }\n  .header { background: #4A90E2; color: white; padding: 20px; text-align: center; }\n  .summary { background: #f4f4f4; padding: 15px; margin: 20px 0; border-left: 4px solid #4A90E2; }\n  .competitor { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }\n  .metric { display: inline-block; margin: 10px 20px 10px 0; }\n  .metric-value { font-size: 24px; font-weight: bold; color: #4A90E2; }\n  .metric-label { font-size: 12px; color: #666; }\n</style></head>\n<body>\n  <div class=\"header\">\n    <h1>📊 Daily Competitive Intelligence Digest</h1>\n    <p>{{ $now.toFormat(\"MMMM d, yyyy\") }}</p>\n  </div>\n  \n  <div class=\"summary\">\n    <h2>Executive Summary</h2>\n    <p>Monitoring {{ $(\"Analyze Trends\").all().length }} competitors over the past 30 days.</p>\n    <div class=\"metric\">\n      <div class=\"metric-value\">{{ $(\"Analyze Trends\").all().reduce((sum, item) => sum + item.json.count_competitor, 0) }}</div>\n      <div class=\"metric-label\">Total Developments</div>\n    </div>\n    <div class=\"metric\">\n      <div class=\"metric-value\">{{ Math.round($(\"Analyze Trends\").all().reduce((sum, item) => sum + item.json.average_impact_score, 0) / $(\"Analyze Trends\").all().length) }}</div>\n      <div class=\"metric-label\">Avg Impact Score</div>\n    </div>\n  </div>\n  \n  <h2>Competitor Activity (Last 30 Days)</h2>\n  {{ $(\"Sort by Activity\").all().map(item => `\n    <div class=\"competitor\">\n      <h3>${item.json.competitor}</h3>\n      <p><strong>Developments:</strong> ${item.json.count_competitor} | <strong>Avg Impact:</strong> ${Math.round(item.json.average_impact_score)}/100 | <strong>Categories:</strong> ${item.json.countUnique_category}</p>\n    </div>\n  `).join(\"\") }}\n  \n  <div style=\"margin-top: 30px; padding: 15px; background: #f9f9f9; border-top: 2px solid #4A90E2;\">\n    <p style=\"font-size: 12px; color: #666;\">This report was automatically generated by your n8n Competitive Intelligence workflow. High-priority alerts were sent to Slack in real-time.</p>\n  </div>\n</body>\n</html>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "5be2f9f2-bf7f-4b33-a934-6e3d705aa720",
+      "name": "Send Daily Intelligence Digest",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2608,
+        400
+      ],
+      "webhookId": "d665a2ed-4335-4be1-aaf4-0d153f6ad3c6"
+    },
+    {
+      "parameters": {
+        "content": "## 🎯 Competitive Intelligence Monitor\n\n**Purpose:** Automated daily monitoring of competitors with AI-powered analysis\n\n**Key Features:**\n- Real-time news & pricing tracking\n- AI-powered impact scoring\n- Priority-based routing\n- Historical trend analysis\n- Multi-channel alerts\n\n**Business Value:**\n- Saves 10+ hours/week\n- Never miss critical competitor moves\n- Data-driven strategic decisions",
+        "height": 400,
+        "width": 600,
+        "color": 2
+      },
+      "id": "e28d92e0-29e1-487b-8e58-81cebf6a547d",
+      "name": "Sticky Note af079047",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        192,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 🤖 AI Analysis Engine\n\nStructured output ensures consistent data format:\n- Competitor identification\n- Category classification\n- Impact scoring (0-100)\n- Actionable recommendations\n- Sentiment analysis",
+        "height": 200,
+        "width": 300,
+        "color": 4
+      },
+      "id": "553d1d9a-c5c6-46bc-9e9b-08819f4680eb",
+      "name": "Sticky Note 790eafa4",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1104,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 💾 Intelligence Database\n\nData Table provides:\n- Persistent storage\n- Deduplication via upsert\n- Historical trend analysis\n- No external DB needed",
+        "height": 200,
+        "width": 600,
+        "color": 5
+      },
+      "id": "2221c929-d892-430d-b042-5dd716e7e578",
+      "name": "Sticky Note 9ca286f5",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1696,
+        464
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Daily 7 AM Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Competitor Intelligence",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Competitor Pricing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Competitor Intelligence": {
+      "main": [
+        [
+          {
+            "node": "Combine Intelligence Sources",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Intelligence Sources": {
+      "main": [
+        [
+          {
+            "node": "AI Intelligence Analyzer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Competitor Pricing": {
+      "main": [
+        [
+          {
+            "node": "Combine Intelligence Sources",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "AI Intelligence Analyzer": {
+      "main": [
+        [
+          {
+            "node": "Route by Priority",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI GPT-5 Mini": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Intelligence Analyzer",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Intelligence Schema": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Intelligence Analyzer",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Priority": {
+      "main": [
+        [
+          {
+            "node": "Urgent Slack Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Urgent Slack Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Store in Intelligence Database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Urgent Slack Alert": {
+      "main": [
+        [
+          {
+            "node": "Store in Intelligence Database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store in Intelligence Database": {
+      "main": [
+        [
+          {
+            "node": "Get Last 30 Days Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Last 30 Days Data": {
+      "main": [
+        [
+          {
+            "node": "Analyze Trends",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Trends": {
+      "main": [
+        [
+          {
+            "node": "Sort by Activity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sort by Activity": {
+      "main": [
+        [
+          {
+            "node": "Send Daily Intelligence Digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "64a81f04-375d-4471-8ac1-ceba904d0bb1",
+  "meta": {
+    "instanceId": "e03e058dead3a8007d45201cbf7d799be7bf4fd8f3a43222727a6c6d5f023b09"
+  },
+  "id": "LbfYhwMDMTOh2qMA",
+  "tags": []
+}
