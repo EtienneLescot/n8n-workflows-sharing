@@ -1,0 +1,123 @@
+{
+  "id": "6BPqsMWJImJRhHfu",
+  "name": "ServiceOps AI - Quote & Scope Agent",
+  "active": false,
+  "nodes": [
+    {
+      "id": "990973e4-9f3a-45a9-9c17-3451f0d2fc56",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "jobRequest",
+              "type": "object"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "242ffc7c-3a67-4f25-9c13-0a13584b8dd2",
+      "name": "Quote Scope Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ JSON.stringify($json, null, 2) }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a quoting specialist for home-service work. Decide whether the issue can be quoted remotely or needs a site visit, produce a safe scope summary, a pricing approach, and flag low-confidence or policy-sensitive cases for approval."
+        }
+      }
+    },
+    {
+      "id": "4c125a95-4613-40d6-8ae3-b45267890457",
+      "name": "Quote Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        220,
+        180
+      ],
+      "parameters": {
+        "model": {
+          "mode": "id",
+          "value": "={{ $env.SERVICEOPS_MODEL_QUOTE || \"gpt-5-mini\" }}"
+        },
+        "responsesApiEnabled": true,
+        "options": {
+          "temperature": 0.15
+        }
+      }
+    },
+    {
+      "id": "3840b4ea-57c6-48dd-bfe3-253856a0fda5",
+      "name": "Quote Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        400,
+        180
+      ],
+      "parameters": {
+        "schemaType": "manual",
+        "autoFix": true,
+        "jsonSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"remoteQuoteFeasible\": { \"type\": \"boolean\" },\n    \"scopeSummary\": { \"type\": \"string\" },\n    \"pricingLogic\": { \"type\": \"string\" },\n    \"estimatedRangeLow\": { \"type\": \"number\" },\n    \"estimatedRangeHigh\": { \"type\": \"number\" },\n    \"approvalRequired\": { \"type\": \"boolean\" },\n    \"approvalReason\": { \"type\": \"string\" }\n  },\n  \"required\": [\"remoteQuoteFeasible\", \"scopeSummary\", \"pricingLogic\"]\n}"
+      }
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Quote Scope Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Quote Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Quote Scope Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Quote Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Quote Scope Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "tags": [],
+  "isArchived": false
+}

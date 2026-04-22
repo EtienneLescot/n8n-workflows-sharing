@@ -1,0 +1,73 @@
+{
+  "id": "pFlfMPsRXrcM15iA",
+  "name": "ServiceOps AI - CRM & Job Record Update",
+  "active": false,
+  "nodes": [
+    {
+      "id": "b24c4d0a-fce8-4247-9dc9-6c26eaa41b71",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "payload",
+              "type": "object"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "2500b526-69f5-43aa-8c96-98669fd7805b",
+      "name": "Upsert Job Record",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "schema": {
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "mode": "id",
+          "value": "serviceops_jobs"
+        },
+        "query": "INSERT INTO serviceops_jobs (\n  idempotency_key,\n  customer_name,\n  customer_email,\n  customer_phone,\n  service_type,\n  status,\n  assigned_technician,\n  scheduled_time,\n  quote_reference,\n  invoice_reference,\n  payment_link,\n  audit_json\n) VALUES (\n  $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb\n)\nON CONFLICT (idempotency_key) DO UPDATE SET\n  status = EXCLUDED.status,\n  assigned_technician = EXCLUDED.assigned_technician,\n  scheduled_time = EXCLUDED.scheduled_time,\n  quote_reference = EXCLUDED.quote_reference,\n  invoice_reference = EXCLUDED.invoice_reference,\n  payment_link = EXCLUDED.payment_link,\n  audit_json = EXCLUDED.audit_json\nRETURNING *;",
+        "options": {
+          "queryReplacement": "={{ [$json.payload.idempotencyKey || $json.payload.jobRequest?.quoteReference || $execution.id, $json.payload.jobRequest?.customer?.name || \"\", $json.payload.jobRequest?.customer?.email || \"\", $json.payload.jobRequest?.customer?.phone || \"\", $json.payload.serviceType || $json.payload.jobRequest?.serviceType || \"\", $json.payload.nextAction || $json.payload.jobRequest?.status || \"updated\", $json.payload.scheduleIntent?.recommendedTechnician || $json.payload.jobRequest?.assignedTechnician || \"\", $json.payload.scheduleIntent?.recommendedStart || $json.payload.jobRequest?.scheduledTime || \"\", $json.payload.quoteReference || $json.payload.jobRequest?.quoteReference || \"\", $json.payload.invoiceReference || $json.payload.jobRequest?.invoiceReference || \"\", $json.payload.paymentLink || $json.payload.jobRequest?.paymentLink || \"\", JSON.stringify($json.payload.jobRequest?.auditTrail || [])] }}"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Upsert Job Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "tags": [],
+  "isArchived": false
+}

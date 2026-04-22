@@ -1,0 +1,195 @@
+{
+  "id": "8vh9mi6440LPnKZU",
+  "name": "ServiceOps AI - Scheduling & Dispatch Agent",
+  "active": false,
+  "nodes": [
+    {
+      "id": "af66e5a6-3931-4f83-91b6-3756e6e49725",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "jobRequest",
+              "type": "object"
+            },
+            {
+              "name": "scheduleIntent",
+              "type": "object"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "8dda281b-0f48-4eda-89b8-22760825f4d1",
+      "name": "Calendar Conflict Check",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        220,
+        -100
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": "={{ $env.SERVICEOPS_CALENDAR_CONFLICT_WORKFLOW_ID }}",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "jobRequest": "={{ $json.jobRequest }}",
+            "scheduleIntent": "={{ $json.scheduleIntent || {} }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "8f2a85d8-3f31-40d6-8b48-a53e3a89b317",
+      "name": "Route Travel Estimation",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        220,
+        100
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": "={{ $env.SERVICEOPS_ROUTE_ESTIMATE_WORKFLOW_ID }}",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "jobRequest": "={{ $json.jobRequest }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "db2b0f56-ed72-4242-bb49-416d83625522",
+      "name": "Scheduling Dispatch Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ JSON.stringify($json, null, 2) }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "Select the best appointment slot and technician for a home-service company. Respect skills, travel, calendar conflicts, service area rules, and business constraints. Prefer policy-compliant scheduling over aggressive utilization. Flag any rule-breaking recommendation for approval."
+        }
+      }
+    },
+    {
+      "id": "de860f5f-3743-49fc-862f-e86d8d6b3efa",
+      "name": "Scheduling Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        480,
+        200
+      ],
+      "parameters": {
+        "model": {
+          "mode": "id",
+          "value": "={{ $env.SERVICEOPS_MODEL_SCHEDULER || \"gpt-5-mini\" }}"
+        },
+        "responsesApiEnabled": true,
+        "options": {
+          "temperature": 0.1
+        }
+      }
+    },
+    {
+      "id": "dbc33fb4-34da-464b-9924-3aaac02b6c4e",
+      "name": "Scheduling Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        660,
+        200
+      ],
+      "parameters": {
+        "schemaType": "manual",
+        "autoFix": true,
+        "jsonSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"recommendedTechnician\": { \"type\": \"string\" },\n    \"recommendedStart\": { \"type\": \"string\" },\n    \"recommendedEnd\": { \"type\": \"string\" },\n    \"travelMinutes\": { \"type\": \"number\" },\n    \"ruleBreak\": { \"type\": \"boolean\" },\n    \"ruleBreakReason\": { \"type\": \"string\" },\n    \"dispatchSummary\": { \"type\": \"string\" }\n  },\n  \"required\": [\"recommendedTechnician\", \"recommendedStart\", \"dispatchSummary\"]\n}"
+      }
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Calendar Conflict Check",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Route Travel Estimation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calendar Conflict Check": {
+      "main": [
+        [
+          {
+            "node": "Scheduling Dispatch Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Travel Estimation": {
+      "main": [
+        [
+          {
+            "node": "Scheduling Dispatch Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scheduling Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Scheduling Dispatch Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scheduling Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Scheduling Dispatch Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "tags": [],
+  "isArchived": false
+}

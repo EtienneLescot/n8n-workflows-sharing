@@ -1,0 +1,224 @@
+{
+  "id": "K9rciQ0kf8qtUeRt",
+  "name": "ServiceOps AI - Knowledge Retrieval Agent",
+  "active": false,
+  "nodes": [
+    {
+      "id": "f0f06745-f5bd-4623-a1ac-351b2f48d777",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "jobRequest",
+              "type": "object"
+            },
+            {
+              "name": "idempotencyKey",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "fedd82a7-8b97-448e-acd8-82b2682e619a",
+      "name": "Customer History Lookup",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        220,
+        -80
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "schema": {
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "mode": "id",
+          "value": "jobs"
+        },
+        "query": "SELECT customer_name, service_type, status, total_amount, completed_at\nFROM serviceops_jobs\nWHERE customer_email = $1 OR customer_phone = $2\nORDER BY completed_at DESC\nLIMIT 10;",
+        "options": {
+          "queryReplacement": "={{ [$json.jobRequest.customer.email || \"\", $json.jobRequest.customer.phone || \"\"] }}"
+        }
+      }
+    },
+    {
+      "id": "f4a0d81d-942f-4859-a608-321ef2e651e8",
+      "name": "Build Retrieval Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "javaScript",
+        "jsCode": "\nreturn {\n  json: {\n    ...$json,\n    retrievalPrompt: [\n      $json.jobRequest?.serviceType,\n      $json.jobRequest?.issueSummary,\n      $json.jobRequest?.issueDetails,\n      $json.jobRequest?.serviceLocation?.city,\n      $json.jobRequest?.serviceLocation?.postalCode,\n    ].filter(Boolean).join(' | '),\n  },\n};"
+      }
+    },
+    {
+      "id": "ffb4c4fd-905a-4657-aafc-9c9e97b8d50c",
+      "name": "Knowledge Retrieval Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        680,
+        0
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ JSON.stringify($json, null, 2) }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "Retrieve operational context for a home-service job. Use the vector store tool for SOPs, policies, service-area rules, FAQs, and pricing notes. Use the supplied customer history rows to summarize prior jobs and risks. Return only what the downstream quote or scheduler needs."
+        }
+      }
+    },
+    {
+      "id": "efc2317e-76e4-4d0b-810d-836006bdc6c7",
+      "name": "Knowledge Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        680,
+        200
+      ],
+      "parameters": {
+        "model": {
+          "mode": "id",
+          "value": "={{ $env.SERVICEOPS_MODEL_KNOWLEDGE || \"gpt-5-mini\" }}"
+        },
+        "responsesApiEnabled": true,
+        "options": {
+          "temperature": 0.1
+        }
+      }
+    },
+    {
+      "id": "262e3dd8-7b94-44af-87d8-f98d07d8ab9f",
+      "name": "Knowledge Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        860,
+        200
+      ],
+      "parameters": {
+        "schemaType": "manual",
+        "autoFix": true,
+        "jsonSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"sopSummary\": { \"type\": \"string\" },\n    \"serviceAreaRule\": { \"type\": \"string\" },\n    \"pricingGuidance\": { \"type\": \"string\" },\n    \"faqNotes\": { \"type\": \"string\" },\n    \"customerHistorySummary\": { \"type\": \"string\" },\n    \"policyRisks\": { \"type\": \"array\", \"items\": { \"type\": \"string\" } }\n  },\n  \"required\": [\"sopSummary\", \"pricingGuidance\"]\n}"
+      }
+    },
+    {
+      "id": "9c4bc182-d00a-41f7-8002-ae9f416e382a",
+      "name": "Knowledge Vector Store Tool",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.3,
+      "position": [
+        1040,
+        20
+      ],
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolName": "serviceops_knowledge_base",
+        "toolDescription": "Search SOPs, pricing notes, service area rules, warranty rules, FAQs, and past playbooks for the service company.",
+        "tableName": {
+          "mode": "id",
+          "value": "={{ $env.SERVICEOPS_VECTOR_TABLE || \"serviceops_knowledge\" }}"
+        },
+        "prompt": "={{ $json.retrievalPrompt }}",
+        "topK": 6,
+        "includeDocumentMetadata": true,
+        "useReranker": true,
+        "id": "={{ $json.idempotencyKey || $execution.id }}"
+      }
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Customer History Lookup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Customer History Lookup": {
+      "main": [
+        [
+          {
+            "node": "Build Retrieval Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Retrieval Prompt": {
+      "main": [
+        [
+          {
+            "node": "Knowledge Retrieval Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Knowledge Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Knowledge Retrieval Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Knowledge Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Knowledge Retrieval Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Knowledge Vector Store Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Knowledge Retrieval Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "tags": [],
+  "isArchived": false
+}

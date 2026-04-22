@@ -1,0 +1,195 @@
+{
+  "id": "YWs4SIlAciSSdxP1",
+  "name": "ServiceOps AI - Escalation & Manual Review Queue",
+  "active": false,
+  "nodes": [
+    {
+      "id": "1f344e81-9623-4d3a-8455-8d1428e75e78",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "jobRequest",
+              "type": "object"
+            },
+            {
+              "name": "actionPackage",
+              "type": "object"
+            },
+            {
+              "name": "approvalReason",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "95a0cb77-907f-4df7-ad0f-497b896d2635",
+      "webhookId": "8a9114a5-abe5-47ee-b7e8-3b0bc1ec7be9",
+      "name": "Slack Review Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        220,
+        -80
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "id",
+          "value": "={{ $env.SERVICEOPS_REVIEW_SLACK_CHANNEL_ID }}"
+        },
+        "messageType": "text",
+        "text": "={{ \"Manual review required: \" + ($json.approvalReason || \"Policy review\") + \" | Customer: \" + ($json.jobRequest.customer.name || \"unknown\") + \" | Service: \" + ($json.jobRequest.issueSummary || \"\") }}"
+      }
+    },
+    {
+      "id": "319bd212-ca31-4ed8-86c2-e8129c3233df",
+      "webhookId": "e195034b-c5cc-4649-a42f-19d5ab8a2076",
+      "name": "Email Reviewer",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        220,
+        100
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $env.SERVICEOPS_REVIEW_EMAIL }}",
+        "subject": "={{ \"Approval needed: \" + ($json.approvalReason || \"Manual review\") }}",
+        "emailType": "text",
+        "message": "={{ JSON.stringify($json.actionPackage || $json, null, 2) }}"
+      }
+    },
+    {
+      "id": "21177a60-5e13-4d5f-8749-a645f11aa47d",
+      "webhookId": "94bf75bc-170f-43db-9bd5-779191deab0e",
+      "name": "Wait For Approval",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        460,
+        0
+      ],
+      "parameters": {
+        "resume": "form",
+        "incomingAuthentication": "basicAuth",
+        "formTitle": "ServiceOps approval required",
+        "formDescription": "Review the job details, quote or dispatch recommendation, confidence score, urgency, service area check, estimated value, and policy notes before approving.",
+        "formFields": {
+          "values": [
+            {
+              "fieldName": "decision",
+              "fieldLabel": "Decision",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "approve"
+                  },
+                  {
+                    "option": "reject"
+                  },
+                  {
+                    "option": "needs_changes"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldName": "reviewer_notes",
+              "fieldLabel": "Reviewer Notes",
+              "fieldType": "textarea",
+              "requiredField": false
+            }
+          ]
+        },
+        "responseMode": "onReceived",
+        "responseCode": 200,
+        "responseData": "firstEntryJson",
+        "responseBinaryPropertyName": "data",
+        "limitWaitTime": true,
+        "limitType": "afterTimeInterval",
+        "resumeAmount": 8,
+        "resumeUnit": "hours"
+      }
+    },
+    {
+      "id": "77e5cf89-6af9-4dc1-bbc1-c5600b54262f",
+      "name": "Normalize Approval Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "javaScript",
+        "jsCode": "\nconst decision = $json.decision || 'needs_changes';\nreturn {\n  json: {\n    ...$json.actionPackage,\n    approvalStatus: decision,\n    reviewerNotes: $json.reviewer_notes || '',\n    approvalRequired: false,\n    nextAction: decision === 'approve' ? ($json.actionPackage?.nextAction || 'manual_review') : 'manual_review',\n  },\n};"
+      }
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Slack Review Alert",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Email Reviewer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack Review Alert": {
+      "main": [
+        [
+          {
+            "node": "Wait For Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait For Approval": {
+      "main": [
+        [
+          {
+            "node": "Normalize Approval Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "tags": [],
+  "isArchived": false
+}

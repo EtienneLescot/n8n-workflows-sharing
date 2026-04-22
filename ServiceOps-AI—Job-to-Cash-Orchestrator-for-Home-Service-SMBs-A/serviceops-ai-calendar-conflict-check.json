@@ -1,0 +1,98 @@
+{
+  "id": "OrVJCxEI5kLJkkqA",
+  "name": "ServiceOps AI - Calendar Conflict Check",
+  "active": false,
+  "nodes": [
+    {
+      "id": "efc88271-21cc-4bab-badf-fa1473aa6afd",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "jobRequest",
+              "type": "object"
+            },
+            {
+              "name": "scheduleIntent",
+              "type": "object"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "158a4f50-8e8e-4e28-8e51-604c10c12d74",
+      "name": "Check Calendar Availability",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "resource": "calendar",
+        "operation": "availability",
+        "calendar": {
+          "mode": "id",
+          "value": "={{ $env.SERVICEOPS_CALENDAR_ID || \"primary\" }}"
+        },
+        "timeMin": "={{ $json.scheduleIntent?.preferredWindow || $now.toISO() }}",
+        "timeMax": "={{ $json.scheduleIntent?.preferredWindow || $now.plus({ days: 2 }).toISO() }}"
+      }
+    },
+    {
+      "id": "55c11695-0aca-4eb5-b10d-3e3bf7ea642f",
+      "name": "Normalize Availability",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "javaScript",
+        "jsCode": "return { json: { ...$json, availableSlots: $json.available || $json.slots || [] } };"
+      }
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Check Calendar Availability",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Calendar Availability": {
+      "main": [
+        [
+          {
+            "node": "Normalize Availability",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "tags": [],
+  "isArchived": false
+}

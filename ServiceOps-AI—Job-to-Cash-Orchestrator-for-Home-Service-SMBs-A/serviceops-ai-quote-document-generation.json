@@ -1,0 +1,126 @@
+{
+  "id": "7x65qH6LK2yIIDd4",
+  "name": "ServiceOps AI - Quote Document Generation",
+  "active": false,
+  "nodes": [
+    {
+      "id": "57dfd4d8-ef9c-4113-ae1f-28871c439590",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "jobRequest",
+              "type": "object"
+            },
+            {
+              "name": "quoteIntent",
+              "type": "object"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "03dcf0f4-bd1d-4e0d-81fd-86497c383144",
+      "name": "Build Quote Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "javaScript",
+        "jsCode": "\nconst low = Number($json.quoteIntent?.estimatedRangeLow || 0);\nconst high = Number($json.quoteIntent?.estimatedRangeHigh || 0);\nreturn {\n  json: {\n    ...$json,\n    quotePayload: {\n      template: $env.SERVICEOPS_QUOTE_TEMPLATE_ID || 'serviceops-default-quote',\n      customerName: $json.jobRequest.customer.name,\n      serviceAddress: $json.jobRequest.serviceLocation.address1,\n      scopeSummary: $json.quoteIntent.scopeSummary,\n      priceRange: low && high ? ('$' + low + ' - $' + high) : 'Pending approval',\n    },\n  },\n};"
+      }
+    },
+    {
+      "id": "d1cba611-9b62-4b71-997c-91a1c632b6a9",
+      "name": "Render Quote Document",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        460,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SERVICEOPS_DOC_RENDER_URL }}",
+        "authentication": "none",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "={{ { \"x-template-key\": $env.SERVICEOPS_DOC_RENDER_TOKEN || \"\" } }}",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.quotePayload }}"
+      }
+    },
+    {
+      "id": "9929cda5-68ac-427d-9255-e5d00b777ed6",
+      "name": "Normalize Quote Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "javaScript",
+        "jsCode": "return { json: { ...$json, quoteReference: $json.id || $json.reference || $execution.id, quoteDocumentUrl: $json.url || $json.documentUrl || '' } };"
+      }
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Build Quote Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Quote Payload": {
+      "main": [
+        [
+          {
+            "node": "Render Quote Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render Quote Document": {
+      "main": [
+        [
+          {
+            "node": "Normalize Quote Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "tags": [],
+  "isArchived": false
+}

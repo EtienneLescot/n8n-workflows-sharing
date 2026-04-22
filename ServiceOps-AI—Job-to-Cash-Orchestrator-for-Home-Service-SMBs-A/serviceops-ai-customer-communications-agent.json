@@ -1,0 +1,131 @@
+{
+  "id": "lZULnNaxNYIv4zWB",
+  "name": "ServiceOps AI - Customer Communications Agent",
+  "active": false,
+  "nodes": [
+    {
+      "id": "e603ad60-b700-4f74-b35e-2e935469e652",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "jobRequest",
+              "type": "object"
+            },
+            {
+              "name": "eventType",
+              "type": "string"
+            },
+            {
+              "name": "actionPackage",
+              "type": "object"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "8ebd35b7-1d0c-40dc-8227-4e0c02c2feff",
+      "name": "Communications Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ JSON.stringify($json, null, 2) }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "Write concise, customer-safe service business communications. Draft confirmations, reminders, follow-up questions, invoice notices, review requests, and upsell suggestions. Keep tone professional, direct, and low-friction. Never disclose internal reasoning or policy language."
+        }
+      }
+    },
+    {
+      "id": "4d289a92-39bc-482d-b0a6-22b1352cb58a",
+      "name": "Communications Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        220,
+        180
+      ],
+      "parameters": {
+        "model": {
+          "mode": "id",
+          "value": "={{ $env.SERVICEOPS_MODEL_COMMS || \"gpt-5-mini\" }}"
+        },
+        "responsesApiEnabled": true,
+        "options": {
+          "temperature": 0.3
+        }
+      }
+    },
+    {
+      "id": "33e03c3e-9ed8-4164-ae66-43e9d4fea47f",
+      "name": "Communications Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        400,
+        180
+      ],
+      "parameters": {
+        "schemaType": "manual",
+        "autoFix": true,
+        "jsonSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"messageSubject\": { \"type\": \"string\" },\n    \"customerMessage\": { \"type\": \"string\" },\n    \"internalSummary\": { \"type\": \"string\" },\n    \"reviewRequestMessage\": { \"type\": \"string\" },\n    \"upsellOfferMessage\": { \"type\": \"string\" }\n  },\n  \"required\": [\"customerMessage\"]\n}"
+      }
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Communications Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Communications Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Communications Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Communications Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Communications Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "tags": [],
+  "isArchived": false
+}

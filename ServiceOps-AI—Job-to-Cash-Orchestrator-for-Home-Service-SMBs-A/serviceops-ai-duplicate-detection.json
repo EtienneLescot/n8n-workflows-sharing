@@ -1,0 +1,103 @@
+{
+  "id": "7duBWfuMao46iXAA",
+  "name": "ServiceOps AI - Duplicate Detection",
+  "active": false,
+  "nodes": [
+    {
+      "id": "4900df2c-b96c-43ce-b9b5-1cc9cc1a1416",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "idempotencyKey",
+              "type": "string"
+            },
+            {
+              "name": "jobRequest",
+              "type": "object"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "bab7f1fc-c9d1-4ec2-8a64-0df843fb8869",
+      "name": "Lookup Existing Request",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "schema": {
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "mode": "id",
+          "value": "serviceops_intake_guard"
+        },
+        "query": "INSERT INTO serviceops_intake_guard (idempotency_key, created_at)\nVALUES ($1, NOW())\nON CONFLICT (idempotency_key) DO NOTHING\nRETURNING idempotency_key;",
+        "options": {
+          "queryReplacement": "={{ [$json.idempotencyKey] }}"
+        }
+      }
+    },
+    {
+      "id": "998bd636-b6df-4af2-a564-1ac5ce43351b",
+      "name": "Normalize Duplicate Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "javaScript",
+        "jsCode": "\nconst inserted = Array.isArray($input.all()) ? $input.all().length > 0 : true;\nreturn {\n  json: {\n    ...$json,\n    isDuplicate: !inserted,\n    duplicateReason: inserted ? '' : 'A matching idempotency key already exists',\n  },\n};"
+      }
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Lookup Existing Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Existing Request": {
+      "main": [
+        [
+          {
+            "node": "Normalize Duplicate Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "tags": [],
+  "isArchived": false
+}

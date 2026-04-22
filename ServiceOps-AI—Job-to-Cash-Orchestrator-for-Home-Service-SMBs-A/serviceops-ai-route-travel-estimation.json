@@ -1,0 +1,96 @@
+{
+  "id": "wVCy4fjuq9mP7URP",
+  "name": "ServiceOps AI - Route & Travel Estimation",
+  "active": false,
+  "nodes": [
+    {
+      "id": "3834388d-65dc-47d5-9080-c117c2c6144f",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "jobRequest",
+              "type": "object"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a70c72ee-ac4e-4e5c-8ad3-c14cb4652e61",
+      "name": "Estimate Travel",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SERVICEOPS_ROUTE_API_URL }}",
+        "authentication": "none",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "={{ { \"authorization\": \"Bearer \" + ($env.SERVICEOPS_ROUTE_API_TOKEN || \"\") } }}",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ { destination: $json.jobRequest.serviceLocation, skills: $json.jobRequest.requiredSkills || [] } }}"
+      }
+    },
+    {
+      "id": "649865cf-f43f-4628-b6a9-ef195f73500e",
+      "name": "Normalize Route Estimate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "javaScript",
+        "jsCode": "return { json: { ...$json, technicianCandidates: $json.technicians || [], averageTravelMinutes: $json.averageTravelMinutes || 0 } };"
+      }
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Estimate Travel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Estimate Travel": {
+      "main": [
+        [
+          {
+            "node": "Normalize Route Estimate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "tags": [],
+  "isArchived": false
+}

@@ -1,0 +1,73 @@
+{
+  "id": "Efp8mkSraDSqCran",
+  "name": "ServiceOps AI - Analytics & Decision Log",
+  "active": false,
+  "nodes": [
+    {
+      "id": "146a9a3f-c362-4013-a987-73e9e6fc2006",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "payload",
+              "type": "object"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "cb709a58-d409-4c75-a98d-580be61d0fee",
+      "name": "Write Decision Log",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "schema": {
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "mode": "id",
+          "value": "serviceops_decision_log"
+        },
+        "query": "INSERT INTO serviceops_decision_log (logged_at, payload_json)\nVALUES (NOW(), $1::jsonb)\nRETURNING logged_at;",
+        "options": {
+          "queryReplacement": "={{ [JSON.stringify($json.payload || $json)] }}"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Write Decision Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "tags": [],
+  "isArchived": false
+}

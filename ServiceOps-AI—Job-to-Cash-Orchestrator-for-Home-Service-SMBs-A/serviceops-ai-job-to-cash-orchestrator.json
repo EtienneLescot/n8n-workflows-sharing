@@ -1,0 +1,1029 @@
+{
+  "id": "V3sLd8btpwtEiuUZ",
+  "name": "ServiceOps AI — Job-to-Cash Orchestrator for Home-Service SMBs A",
+  "active": false,
+  "nodes": [
+    {
+      "id": "8c44de8e-025b-4891-83f2-24b2fb0e4d3b",
+      "webhookId": "01bd9eea-a244-4787-88f3-2e74bdb97955",
+      "name": "Intake Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1200,
+        -260
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "serviceops/intake",
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "responseCode": 202,
+        "responseBinaryPropertyName": "data"
+      }
+    },
+    {
+      "id": "e84ac7dc-2759-4141-9a58-77f2413a1db8",
+      "name": "Gmail Intake Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -1200,
+        -80
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "event": "messageReceived",
+        "simple": true,
+        "filters": {
+          "q": "label:inbox newer_than:7d"
+        }
+      }
+    },
+    {
+      "id": "fa7e4bb8-f1f1-4705-9b60-d1d5fbfa525e",
+      "webhookId": "bb59e842-bb19-4739-bf5c-eee4c4267c84",
+      "name": "WhatsApp Intake Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1200,
+        100
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "serviceops/whatsapp",
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "responseCode": 200,
+        "responseBinaryPropertyName": "data"
+      }
+    },
+    {
+      "id": "5813cded-ccb5-4059-98ca-142c23e078b4",
+      "webhookId": "fb6f28b1-b22d-4c29-ba20-0ad5040c5dee",
+      "name": "Voice Transcript Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1200,
+        280
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "serviceops/voice-transcript",
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "responseCode": 202,
+        "responseBinaryPropertyName": "data"
+      }
+    },
+    {
+      "id": "4ab0b768-dbdd-4b33-b47c-e21fc04da560",
+      "webhookId": "e59a45ba-c9ed-4854-8586-6c6327e577e0",
+      "name": "Job Completed Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1200,
+        460
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "serviceops/job-completed",
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "responseCode": 202,
+        "responseBinaryPropertyName": "data"
+      }
+    },
+    {
+      "id": "90dd23e1-4927-4e2d-96b0-a8db6aed7c36",
+      "name": "Normalize Inbound Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -940,
+        100
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "javaScript",
+        "jsCode": "\nconst input = $json;\nconst origin = input.headers?.['x-serviceops-origin'] || input.origin || input.source || input.channel || 'unknown';\nconst body = input.body ?? input;\nconst now = new Date().toISOString();\nconst eventType = body.eventType || (origin === 'job_completed' ? 'job_completed' : 'new_request');\nconst customer = {\n  name: body.customerName || body.fromName || body.name || body.customer?.name || '',\n  email: body.customerEmail || body.email || body.customer?.email || '',\n  phone: body.customerPhone || body.phone || body.from || body.customer?.phone || '',\n  preferredChannel: body.preferredChannel || (body.customer?.email ? 'email' : 'whatsapp'),\n};\nconst location = {\n  address1: body.address || body.serviceAddress || body.location?.address1 || '',\n  city: body.city || body.location?.city || '',\n  region: body.state || body.region || body.location?.region || '',\n  postalCode: body.zip || body.postalCode || body.location?.postalCode || '',\n  notes: body.locationNotes || body.accessNotes || '',\n};\nconst summary = body.issueSummary || body.summary || body.subject || body.title || body.transcriptSummary || '';\nconst details = body.issueDetails || body.description || body.transcript || body.message || body.text || '';\nconst customerKey = [customer.email, customer.phone].filter(Boolean).join('|') || (customer.name || 'anonymous');\nconst fingerprintSeed = [eventType, origin, customerKey, location.address1, summary, details].join('|').toLowerCase();\nconst fingerprint = Buffer.from(fingerprintSeed).toString('base64').slice(0, 48);\n\nreturn {\n  json: {\n    workflowTemplate: 'ServiceOps AI',\n    eventType,\n    requestOrigin: origin,\n    requestReceivedAt: now,\n    jobRequest: {\n      requestOrigin: origin,\n      customer,\n      serviceLocation: location,\n      serviceType: body.serviceType || '',\n      issueSummary: summary,\n      issueDetails: details,\n      urgency: body.urgency || 'unknown',\n      emergencyFlag: Boolean(body.emergencyFlag || false),\n      confidenceLevel: Number(body.confidenceLevel || 0.25),\n      requiredFollowUpQuestions: Array.isArray(body.followUpQuestions) ? body.followUpQuestions : [],\n      serviceAreaValidation: 'unknown',\n      estimatedValue: Number(body.estimatedValue || 0),\n      remoteQuoteFeasibility: body.remoteQuoteFeasibility || 'unknown',\n      requiredSkills: Array.isArray(body.requiredSkills) ? body.requiredSkills : [],\n      preferredTimeWindow: body.preferredTimeWindow || '',\n      nextRecommendedAction: eventType === 'job_completed' ? 'invoice_and_follow_up' : 'triage',\n      approvalRequirement: 'pending',\n      assignedTechnician: body.assignedTechnician || '',\n      scheduledTime: body.scheduledTime || '',\n      quoteReference: body.quoteReference || '',\n      invoiceReference: body.invoiceReference || '',\n      paymentLink: body.paymentLink || '',\n      status: body.status || (eventType === 'job_completed' ? 'job_completed' : 'new'),\n      auditTrail: [{ at: now, actor: 'workflow', action: 'normalized_intake', origin }],\n    },\n    idempotencyKey: fingerprint,\n    rateLimitBucket: customer.phone || customer.email || location.postalCode || 'default',\n    rawPayload: body,\n  },\n};"
+      }
+    },
+    {
+      "id": "8b77fc45-f26a-41a7-b53c-4e35f3420fc9",
+      "name": "Duplicate Detection",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -720,
+        100
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": "={{ $env.SERVICEOPS_DUPLICATE_WORKFLOW_ID }}",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "idempotencyKey": "={{ $json.idempotencyKey }}",
+            "jobRequest": "={{ $json.jobRequest }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "155803f9-95ec-42bb-af9a-46b52fef5a23",
+      "name": "Is Duplicate",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -500,
+        100
+      ],
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.isDuplicate }}",
+              "operation": "true"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "2afc1615-ff87-435e-8d7e-2258b94d9b1c",
+      "name": "Rate Limit Guard",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -280,
+        180
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "javaScript",
+        "jsCode": "\nconst maxBurst = Number($env.SERVICEOPS_RATE_LIMIT_PER_15_MIN || 8);\nconst requiresBackoff = ($json.jobRequest?.auditTrail?.length || 0) > maxBurst;\nreturn {\n  json: {\n    ...$json,\n    requiresBackoff,\n    processingPolicy: requiresBackoff ? 'manual_review' : 'continue',\n  },\n};"
+      }
+    },
+    {
+      "id": "05fdb038-9cf4-450f-9243-30555690286b",
+      "name": "Lifecycle Switch",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -60,
+        180
+      ],
+      "parameters": {
+        "mode": "expression",
+        "numberOutputs": 3,
+        "output": "={{ $json.eventType === \"job_completed\" ? 1 : ($json.requiresBackoff ? 2 : 0) }}"
+      }
+    },
+    {
+      "id": "af0ac071-576d-4858-9d67-bea9d8108a39",
+      "name": "Supervisor AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ JSON.stringify($json, null, 2) }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are the main supervisor for ServiceOps AI, an operations orchestrator for home-service SMBs. Use the available specialist tools before making decisions that affect quoting, dispatching, retrieval, or customer communication. Return a production-safe action package that is concise, grounded in the provided data, and explicit about confidence, approvals, next action, and customer-safe language. Never fabricate policy, pricing, or technician availability. Prefer manual review when confidence is low or rules are violated."
+        }
+      }
+    },
+    {
+      "id": "ed086202-68dc-4ca6-975d-537a319b7593",
+      "name": "Supervisor Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        220,
+        260
+      ],
+      "parameters": {
+        "model": {
+          "mode": "id",
+          "value": "={{ $env.SERVICEOPS_MODEL_SUPERVISOR || \"gpt-5-mini\" }}"
+        },
+        "responsesApiEnabled": true,
+        "options": {
+          "temperature": 0.2
+        }
+      }
+    },
+    {
+      "id": "89c94541-f6a0-4d21-9efd-28891e96a1c1",
+      "name": "Supervisor Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [
+        380,
+        260
+      ],
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.jobRequest.customer.email || $json.jobRequest.customer.phone || $json.idempotencyKey }}",
+        "tableName": "serviceops_agent_memory",
+        "contextWindowLength": 12
+      }
+    },
+    {
+      "id": "5410f8ea-7cf3-4cf7-923c-0c5171838c1a",
+      "name": "Supervisor Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        540,
+        260
+      ],
+      "parameters": {
+        "schemaType": "manual",
+        "autoFix": true,
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"serviceType\": { \"type\": \"string\" },\n    \"urgency\": { \"type\": \"string\" },\n    \"confidenceLevel\": { \"type\": \"number\" },\n    \"emergencyFlag\": { \"type\": \"boolean\" },\n    \"nextAction\": { \"type\": \"string\" },\n    \"approvalRequired\": { \"type\": \"boolean\" },\n    \"approvalReason\": { \"type\": \"string\" },\n    \"customerMessageBrief\": { \"type\": \"string\" },\n    \"internalSummary\": { \"type\": \"string\" },\n    \"requiredFollowUpQuestions\": { \"type\": \"array\", \"items\": { \"type\": \"string\" } },\n    \"quoteIntent\": { \"type\": \"object\" },\n    \"scheduleIntent\": { \"type\": \"object\" },\n    \"invoiceIntent\": { \"type\": \"object\" },\n    \"reviewQueuePayload\": { \"type\": \"object\" }\n  },\n  \"required\": [\"nextAction\", \"approvalRequired\", \"customerMessageBrief\", \"internalSummary\"]\n}",
+        "jsonSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"serviceType\": { \"type\": \"string\" },\n    \"urgency\": { \"type\": \"string\" },\n    \"confidenceLevel\": { \"type\": \"number\" },\n    \"emergencyFlag\": { \"type\": \"boolean\" },\n    \"nextAction\": {\n      \"type\": \"string\",\n      \"enum\": [\n        \"ask_follow_up\",\n        \"prepare_quote\",\n        \"recommend_site_visit\",\n        \"schedule_dispatch\",\n        \"manual_review\",\n        \"emergency_escalation\",\n        \"invoice_and_follow_up\"\n      ]\n    },\n    \"approvalRequired\": { \"type\": \"boolean\" },\n    \"approvalReason\": { \"type\": \"string\" },\n    \"customerMessageBrief\": { \"type\": \"string\" },\n    \"internalSummary\": { \"type\": \"string\" },\n    \"requiredFollowUpQuestions\": {\n      \"type\": \"array\",\n      \"items\": { \"type\": \"string\" }\n    },\n    \"quoteIntent\": {\n      \"type\": \"object\",\n      \"properties\": {\n        \"remoteQuoteFeasible\": { \"type\": \"boolean\" },\n        \"estimatedRangeLow\": { \"type\": \"number\" },\n        \"estimatedRangeHigh\": { \"type\": \"number\" },\n        \"scopeSummary\": { \"type\": \"string\" }\n      }\n    },\n    \"scheduleIntent\": {\n      \"type\": \"object\",\n      \"properties\": {\n        \"preferredWindow\": { \"type\": \"string\" },\n        \"requiredSkills\": { \"type\": \"array\", \"items\": { \"type\": \"string\" } },\n        \"recommendedTechnician\": { \"type\": \"string\" },\n        \"recommendedStart\": { \"type\": \"string\" }\n      }\n    },\n    \"invoiceIntent\": {\n      \"type\": \"object\",\n      \"properties\": {\n        \"invoiceNow\": { \"type\": \"boolean\" },\n        \"amount\": { \"type\": \"number\" },\n        \"lineItems\": { \"type\": \"array\", \"items\": { \"type\": \"object\" } }\n      }\n    },\n    \"reviewQueuePayload\": { \"type\": \"object\" }\n  },\n  \"required\": [\"nextAction\", \"approvalRequired\", \"customerMessageBrief\", \"internalSummary\"]\n}"
+      }
+    },
+    {
+      "id": "7bb8b52e-c138-4a02-92df-a781f4709d1c",
+      "name": "Intake Triage Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        700,
+        -220
+      ],
+      "parameters": {
+        "source": "database",
+        "name": "intake_triage_agent",
+        "description": "Classify service type, extract job facts, detect urgency, and determine whether follow-up is needed.",
+        "workflowId": "={{ $env.SERVICEOPS_TRIAGE_WORKFLOW_ID }}",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "jobRequest": "={{ $json.jobRequest }}",
+            "requestOrigin": "={{ $json.requestOrigin }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "7b1719a7-58ef-4509-91b9-e288afeaa8fd",
+      "name": "Knowledge Retrieval Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        700,
+        -100
+      ],
+      "parameters": {
+        "source": "database",
+        "name": "knowledge_retrieval_agent",
+        "description": "Retrieve SOPs, service area rules, pricebook notes, FAQs, and prior customer history.",
+        "workflowId": "={{ $env.SERVICEOPS_KNOWLEDGE_WORKFLOW_ID }}",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "jobRequest": "={{ $json.jobRequest }}",
+            "idempotencyKey": "={{ $json.idempotencyKey }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "b65221ff-fbbb-4476-be3f-750c92957179",
+      "name": "Quote Scope Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        700,
+        20
+      ],
+      "parameters": {
+        "source": "database",
+        "name": "quote_scope_agent",
+        "description": "Decide remote quote versus site visit and propose scope, pricing logic, and review flags.",
+        "workflowId": "={{ $env.SERVICEOPS_QUOTE_SCOPE_WORKFLOW_ID }}",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "jobRequest": "={{ $json.jobRequest }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "16c84258-265f-4324-a09a-1bd0c054f050",
+      "name": "Scheduling Dispatch Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        700,
+        140
+      ],
+      "parameters": {
+        "source": "database",
+        "name": "scheduling_dispatch_agent",
+        "description": "Select the best slot and technician using skills, calendar availability, and travel constraints.",
+        "workflowId": "={{ $env.SERVICEOPS_SCHEDULING_WORKFLOW_ID }}",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "jobRequest": "={{ $json.jobRequest }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "d061b915-6ce0-42fe-b156-310c0810b08f",
+      "name": "Customer Communications Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        700,
+        260
+      ],
+      "parameters": {
+        "source": "database",
+        "name": "customer_communications_agent",
+        "description": "Draft concise professional customer updates, confirmations, reminders, review asks, and upsell offers.",
+        "workflowId": "={{ $env.SERVICEOPS_COMMS_WORKFLOW_ID }}",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "jobRequest": "={{ $json.jobRequest }}",
+            "eventType": "={{ $json.eventType }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "e02d721e-1c8c-4e89-ad5a-9b60a8dbc479",
+      "name": "Validate Decision Package",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        980,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "javaScript",
+        "jsCode": "\nconst job = $json.jobRequest || {};\nconst nextAction = $json.nextAction || 'manual_review';\nconst highValueQuote = Number($json.quoteIntent?.estimatedRangeHigh || job.estimatedValue || 0) >= Number($env.SERVICEOPS_HIGH_VALUE_QUOTE_THRESHOLD || 750);\nconst highValueInvoice = Number($json.invoiceIntent?.amount || 0) >= Number($env.SERVICEOPS_HIGH_VALUE_INVOICE_THRESHOLD || 1000);\nconst emergencyFlag = Boolean($json.emergencyFlag || job.emergencyFlag);\nconst lowConfidence = Number($json.confidenceLevel || job.confidenceLevel || 0) < Number($env.SERVICEOPS_LOW_CONFIDENCE_THRESHOLD || 0.72);\nconst approvalRequired = Boolean($json.approvalRequired || emergencyFlag || highValueQuote || highValueInvoice || lowConfidence);\nconst approvalReason = $json.approvalReason || (\n  emergencyFlag ? 'Emergency dispatch requires approval' :\n  highValueQuote ? 'High-value quote requires approval' :\n  highValueInvoice ? 'High-value invoice requires approval' :\n  lowConfidence ? 'Low-confidence decision requires review' : ''\n);\n\nreturn {\n  json: {\n    ...$json,\n    nextAction,\n    approvalRequired,\n    approvalReason,\n    serviceType: $json.serviceType || job.serviceType || 'unclassified',\n    urgency: $json.urgency || job.urgency || 'unknown',\n  },\n};"
+      }
+    },
+    {
+      "id": "46c41edb-be75-43a3-a5c7-a450de5ee5ae",
+      "name": "Approval Or Action Switch",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1210,
+        0
+      ],
+      "parameters": {
+        "mode": "expression",
+        "numberOutputs": 5,
+        "output": "={{ $json.approvalRequired ? 0 : ($json.nextAction === \"prepare_quote\" ? 1 : ($json.nextAction === \"schedule_dispatch\" || $json.nextAction === \"recommend_site_visit\" ? 2 : ($json.nextAction === \"ask_follow_up\" ? 3 : 4))) }}"
+      }
+    },
+    {
+      "id": "df000cf4-3672-4a7c-aa24-63e6fc6b8c24",
+      "name": "Manual Review Queue",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1450,
+        -180
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": "={{ $env.SERVICEOPS_MANUAL_REVIEW_WORKFLOW_ID }}",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "jobRequest": "={{ $json.jobRequest }}",
+            "actionPackage": "={{ $json }}",
+            "approvalReason": "={{ $json.approvalReason }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "b23caaf2-9ce0-4d6a-9a3d-d4920318af85",
+      "name": "Quote Document Generation",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1450,
+        -20
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": "={{ $env.SERVICEOPS_QUOTE_DOCUMENT_WORKFLOW_ID }}",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "jobRequest": "={{ $json.jobRequest }}",
+            "quoteIntent": "={{ $json.quoteIntent }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "89c615e5-d243-4e7a-aa5c-9b055ed63cb4",
+      "name": "CRM Job Update",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1890,
+        120
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": "={{ $env.SERVICEOPS_CRM_UPDATE_WORKFLOW_ID }}",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "payload": "={{ $json }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "5fdc3991-1ee1-4722-8968-4dd970d10108",
+      "name": "Communications Agent Workflow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2120,
+        120
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": "={{ $env.SERVICEOPS_COMMS_WORKFLOW_ID }}",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "jobRequest": "={{ $json.jobRequest }}",
+            "eventType": "={{ $json.eventType || \"customer_update\" }}",
+            "actionPackage": "={{ $json }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "eab39c97-2ae8-4d39-95ee-58432d6502d5",
+      "name": "Scheduling Execution",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1450,
+        140
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": "={{ $env.SERVICEOPS_SCHEDULING_WORKFLOW_ID }}",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "jobRequest": "={{ $json.jobRequest }}",
+            "scheduleIntent": "={{ $json.scheduleIntent }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "cb38a900-01e2-47de-a725-ccfcd8c4f9b8",
+      "name": "Follow Up Uses Existing Draft",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1450,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "javaScript",
+        "jsCode": "return { json: { ...$json, messageBody: $json.customerMessageBrief || 'We need a bit more information before we can proceed.', messageSubject: 'Quick follow-up on your service request' } };"
+      }
+    },
+    {
+      "id": "00defc47-f7b0-4301-bcc9-d3ee635c67a3",
+      "name": "Invoice And Payment",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        220,
+        420
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": "={{ $env.SERVICEOPS_INVOICE_PAYMENT_WORKFLOW_ID }}",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "jobRequest": "={{ $json.jobRequest }}",
+            "invoiceIntent": "={{ $json.invoiceIntent || {} }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "e36e25ba-0abd-4e85-adba-36054983682d",
+      "name": "Preferred Channel Switch",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        2360,
+        120
+      ],
+      "parameters": {
+        "mode": "expression",
+        "numberOutputs": 3,
+        "output": "={{ $json.jobRequest?.customer?.preferredChannel === \"whatsapp\" ? 0 : ($json.jobRequest?.customer?.preferredChannel === \"sms\" ? 1 : 2) }}"
+      }
+    },
+    {
+      "id": "504d4e8a-aad0-44c4-99aa-22e272a0cf4b",
+      "webhookId": "5f69d0df-3523-4ec6-9fb1-d00326b92e4d",
+      "name": "Send WhatsApp Update",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        2590,
+        20
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "phoneNumberId": "={{ $env.SERVICEOPS_WHATSAPP_PHONE_NUMBER_ID }}",
+        "recipientPhoneNumber": "={{ $json.jobRequest.customer.phone }}",
+        "messageType": "text",
+        "textBody": "={{ $json.customerMessage || $json.messageBody || $json.customerMessageBrief }}"
+      }
+    },
+    {
+      "id": "8c3f5596-29e1-40a2-ada6-82742c47a0ce",
+      "webhookId": "77deaa88-e161-4823-af6b-064ffadbc5dc",
+      "name": "Send Email Update",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2590,
+        220
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $json.jobRequest.customer.email }}",
+        "subject": "={{ $json.messageSubject || \"Service update from your service team\" }}",
+        "emailType": "text",
+        "message": "={{ $json.customerMessage || $json.messageBody || $json.customerMessageBrief }}"
+      }
+    },
+    {
+      "id": "9f1cf22c-3ec0-4067-bab5-29a2ca9f2780",
+      "name": "Analytics Decision Log",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2820,
+        120
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": "={{ $env.SERVICEOPS_ANALYTICS_WORKFLOW_ID }}",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "payload": "={{ $json }}"
+          }
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Intake Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Inbound Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail Intake Trigger": {
+      "main": [
+        [
+          {
+            "node": "Normalize Inbound Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Intake Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Inbound Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Voice Transcript Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Inbound Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Job Completed Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Inbound Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Inbound Request": {
+      "main": [
+        [
+          {
+            "node": "Duplicate Detection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Duplicate Detection": {
+      "main": [
+        [
+          {
+            "node": "Is Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Duplicate": {
+      "main": [
+        [
+          {
+            "node": "Analytics Decision Log",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Rate Limit Guard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rate Limit Guard": {
+      "main": [
+        [
+          {
+            "node": "Lifecycle Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lifecycle Switch": {
+      "main": [
+        [
+          {
+            "node": "Supervisor AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Invoice And Payment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Manual Review Queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supervisor AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Validate Decision Package",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Decision Package": {
+      "main": [
+        [
+          {
+            "node": "Approval Or Action Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approval Or Action Switch": {
+      "main": [
+        [
+          {
+            "node": "Manual Review Queue",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Quote Document Generation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Scheduling Execution",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Follow Up Uses Existing Draft",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "CRM Job Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Review Queue": {
+      "main": [
+        [
+          {
+            "node": "CRM Job Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Quote Document Generation": {
+      "main": [
+        [
+          {
+            "node": "CRM Job Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scheduling Execution": {
+      "main": [
+        [
+          {
+            "node": "CRM Job Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Follow Up Uses Existing Draft": {
+      "main": [
+        [
+          {
+            "node": "CRM Job Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Invoice And Payment": {
+      "main": [
+        [
+          {
+            "node": "CRM Job Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CRM Job Update": {
+      "main": [
+        [
+          {
+            "node": "Communications Agent Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Communications Agent Workflow": {
+      "main": [
+        [
+          {
+            "node": "Preferred Channel Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preferred Channel Switch": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Update",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send WhatsApp Update",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Email Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WhatsApp Update": {
+      "main": [
+        [
+          {
+            "node": "Analytics Decision Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email Update": {
+      "main": [
+        [
+          {
+            "node": "Analytics Decision Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supervisor Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Supervisor AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supervisor Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Supervisor AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supervisor Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Supervisor AI Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Intake Triage Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Supervisor AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Knowledge Retrieval Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Supervisor AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Quote Scope Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Supervisor AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scheduling Dispatch Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Supervisor AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Customer Communications Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Supervisor AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "tags": [],
+  "isArchived": false
+}

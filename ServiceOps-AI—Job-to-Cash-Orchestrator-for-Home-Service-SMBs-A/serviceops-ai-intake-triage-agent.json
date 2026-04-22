@@ -1,0 +1,127 @@
+{
+  "id": "Z3DqeoPt2VukCTsH",
+  "name": "ServiceOps AI - Intake & Triage Agent",
+  "active": false,
+  "nodes": [
+    {
+      "id": "46d29dfd-6f51-4040-8e35-3ed4afcab7b9",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "jobRequest",
+              "type": "object"
+            },
+            {
+              "name": "requestOrigin",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "7f1c872b-619b-4b84-95c7-7c81836351af",
+      "name": "Intake Triage Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ JSON.stringify($json, null, 2) }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You classify inbound service requests for home-service SMBs. Extract service type, urgency, emergency status, missing fields, and whether follow-up is required. Do not invent details. Keep the output operational and structured."
+        }
+      }
+    },
+    {
+      "id": "78c2b629-7979-4002-a056-c699867e48e9",
+      "name": "Intake Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        220,
+        180
+      ],
+      "parameters": {
+        "model": {
+          "mode": "id",
+          "value": "={{ $env.SERVICEOPS_MODEL_TRIAGE || \"gpt-5-mini\" }}"
+        },
+        "responsesApiEnabled": true,
+        "options": {
+          "temperature": 0.1
+        }
+      }
+    },
+    {
+      "id": "41763e1e-2fa8-4e65-a678-29c5413b4c87",
+      "name": "Intake Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        400,
+        180
+      ],
+      "parameters": {
+        "schemaType": "manual",
+        "autoFix": true,
+        "jsonSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"serviceType\": { \"type\": \"string\" },\n    \"urgency\": { \"type\": \"string\" },\n    \"emergencyFlag\": { \"type\": \"boolean\" },\n    \"confidenceLevel\": { \"type\": \"number\" },\n    \"requiredFollowUpQuestions\": { \"type\": \"array\", \"items\": { \"type\": \"string\" } },\n    \"remoteQuoteFeasibility\": { \"type\": \"string\" },\n    \"requiredSkills\": { \"type\": \"array\", \"items\": { \"type\": \"string\" } },\n    \"serviceAreaValidation\": { \"type\": \"string\" }\n  },\n  \"required\": [\"serviceType\", \"urgency\", \"emergencyFlag\", \"confidenceLevel\"]\n}"
+      }
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Intake Triage Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Intake Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Intake Triage Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Intake Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Intake Triage Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "tags": [],
+  "isArchived": false
+}

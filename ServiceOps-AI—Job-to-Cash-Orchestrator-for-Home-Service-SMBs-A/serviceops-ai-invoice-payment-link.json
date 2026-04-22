@@ -1,0 +1,126 @@
+{
+  "id": "c0mQbcBu7ki1jWuZ",
+  "name": "ServiceOps AI - Invoice Generation & Payment Link",
+  "active": false,
+  "nodes": [
+    {
+      "id": "ac958fc5-5100-439e-98aa-a46ae6afd013",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "jobRequest",
+              "type": "object"
+            },
+            {
+              "name": "invoiceIntent",
+              "type": "object"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "7d905fb0-d525-4fb2-b81f-e7a080b7c5f0",
+      "name": "Build Invoice Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "javaScript",
+        "jsCode": "\nreturn {\n  json: {\n    invoicePayload: {\n      customerName: $json.jobRequest.customer.name,\n      customerEmail: $json.jobRequest.customer.email,\n      customerPhone: $json.jobRequest.customer.phone,\n      amount: Number($json.invoiceIntent?.amount || $json.jobRequest.estimatedValue || 0),\n      lineItems: $json.invoiceIntent?.lineItems || [{ description: $json.jobRequest.issueSummary || 'Service work', amount: Number($json.jobRequest.estimatedValue || 0) }],\n      externalJobId: $json.jobRequest.quoteReference || $execution.id,\n    },\n  },\n};"
+      }
+    },
+    {
+      "id": "6b553569-d417-4232-8b2f-09e3d0ac25fe",
+      "name": "Create Invoice Payment Link",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        460,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SERVICEOPS_BILLING_API_URL }}",
+        "authentication": "none",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "={{ { \"authorization\": \"Bearer \" + ($env.SERVICEOPS_BILLING_API_TOKEN || \"\") } }}",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.invoicePayload }}"
+      }
+    },
+    {
+      "id": "4a6cefec-5544-4d1f-8531-47838b5b8769",
+      "name": "Normalize Invoice Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "javaScript",
+        "jsCode": "return { json: { ...$json, invoiceReference: $json.invoiceId || $json.id || $execution.id, paymentLink: $json.paymentLink || $json.checkoutUrl || '' } };"
+      }
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Build Invoice Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Invoice Payload": {
+      "main": [
+        [
+          {
+            "node": "Create Invoice Payment Link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Invoice Payment Link": {
+      "main": [
+        [
+          {
+            "node": "Normalize Invoice Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "tags": [],
+  "isArchived": false
+}
